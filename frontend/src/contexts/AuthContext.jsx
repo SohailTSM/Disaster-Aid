@@ -65,7 +65,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       // Demo NGO user
-      if (email === 'demo@ngo.org') {
+      if (email === 'git') {
         const demoUser = {
           id: 'demo-ngo-1',
           name: 'Demo NGO',

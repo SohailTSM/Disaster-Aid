@@ -199,9 +199,13 @@ export default function Dispatcher() {
   const navigate = useNavigate();
 
   const handleViewRequest = (request) => {
-    navigate(`/request/${request._id || request.id}`, {
-      state: { request }
-    });
+    console.log('Viewing request:', request);
+    const requestId = encodeURIComponent(request.id || request._id); // Encode the ID to handle special characters
+    const url = `/request/${requestId}`;
+    console.log('Navigating to:', url);
+    
+    // Navigate using window.location to avoid React Router issues with special characters
+    window.location.href = url;
   };
 
   const handleAssignRequest = () => {

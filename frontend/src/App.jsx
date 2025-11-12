@@ -11,6 +11,7 @@ import Dispatcher from './pages/Dispatcher';
 import NGO from './pages/NGO';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import RequestDetails from './pages/RequestDetails';
 
 // Components
 import Navbar from './components/Navbar';
@@ -43,7 +44,8 @@ const ProtectedRoute = ({ children, roles = [] }) => {
     return <Navigate to="/" replace />;
   }
   
-  return children;
+  // Make sure to return the children directly, not as a function
+  return typeof children === 'function' ? children() : children;
 };
 
 function AppContent() {
@@ -61,12 +63,20 @@ function AppContent() {
       <Navbar />
       <Routes>
         {/* Public Routes - Accessible to everyone */}
-        <Route path="/" element={<RequestForm />} />
-        <Route path="/request-help" element={<RequestForm />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         
         {/* Protected Routes */}
+        <Route path="/" element={
+          <ProtectedRoute>
+            <RequestForm />
+          </ProtectedRoute>
+        } />
+        <Route path="/request-help" element={
+          <ProtectedRoute>
+            <RequestForm />
+          </ProtectedRoute>
+        } />
         <Route
           path="/dispatcher"
           element={
@@ -74,6 +84,14 @@ function AppContent() {
               <Dispatcher />
             </ProtectedRoute>
           }
+        />
+        <Route 
+          path="/request/:id" 
+          element={
+            <ProtectedRoute roles={['dispatcher']}>
+              <RequestDetails />
+            </ProtectedRoute>
+          } 
         />
         <Route
           path="/ngo"
@@ -87,15 +105,7 @@ function AppContent() {
         {/* Catch all - redirect to appropriate page based on auth status */}
         <Route path="*" element={
           <ProtectedRoute>
-            {() => {
-              const { user } = useAuth();
-              if (user?.role === 'dispatcher') {
-                return <Navigate to="/dispatcher" replace />;
-              } else if (user?.role === 'ngo') {
-                return <Navigate to="/ngo" replace />;
-              }
-              return <Navigate to="/" replace />;
-            }}
+            <Navigate to="/" replace />
           </ProtectedRoute>
         } />
       </Routes>

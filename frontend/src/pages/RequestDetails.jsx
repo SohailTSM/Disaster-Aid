@@ -76,12 +76,85 @@ const RequestDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const [request, setRequest] = useState(location.state?.request || null);
-  const [loading, setLoading] = useState(!location.state?.request);
+  const [request, setRequest] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [assignedNGOs, setAssignedNGOs] = useState({});
   const [selectedNeed, setSelectedNeed] = useState(null);
   const [openNgoDialog, setOpenNgoDialog] = useState(false);
+
+  // Load request data when component mounts
+  useEffect(() => {
+    const loadRequest = async () => {
+      try {
+        setLoading(true);
+        console.log('Loading request with ID:', id);
+        
+        // Decode the ID if it was encoded
+        const decodedId = decodeURIComponent(id);
+        console.log('Decoded request ID:', decodedId);
+        
+        // First check if we have the request in location state
+        const requestFromState = location.state?.request;
+        
+        if (requestFromState) {
+          console.log('Using request from location state');
+          setRequest(requestFromState);
+          setLoading(false);
+          return;
+        }
+        
+        // If not in location state, we'll use mock data
+        console.log('No request in location state, using mock data');
+        
+        // Simulate API call
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        const mockRequest = {
+          id: id || 'REQ-' + Math.floor(Math.random() * 10000),
+          contactName: 'John Doe',
+          contactPhone: '+1 (555) 123-4567',
+          location: '123 Main St, Anytown, CA 90210',
+          beneficiaries: 150,
+          status: 'Active',
+          type: 'Flood Relief',
+          priority: 'High',
+          date: '2023-11-13',
+          notes: 'Urgent supplies needed for flood-affected families. Many homes are underwater and people have lost everything.',
+          needs: [
+            {
+              type: 'Food',
+              quantity: 150,
+              items: ['Ready-to-eat meals', 'Bottled water', 'Snacks'],
+              assignedTo: null
+            },
+            {
+              type: 'Shelter',
+              quantity: 50,
+              items: ['Tents', 'Blankets', 'Sleeping bags'],
+              assignedTo: null
+            },
+            {
+              type: 'Medical',
+              quantity: 30,
+              items: ['First aid kits', 'Medicines', 'Hygiene kits'],
+              assignedTo: null
+            }
+          ]
+        };
+        
+        console.log('Setting mock request:', mockRequest);
+        setRequest(mockRequest);
+      } catch (err) {
+        console.error('Error loading request:', err);
+        setError('Failed to load request details');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadRequest();
+  }, [id, location.state]);
 
   const handleViewNGOs = (need) => {
     setSelectedNeed(need);
@@ -176,8 +249,16 @@ const RequestDetails = () => {
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="80vh">
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh',
+        flexDirection: 'column',
+        gap: 2
+      }}>
         <CircularProgress />
+        <Typography>Loading request details...</Typography>
       </Box>
     );
   }
@@ -185,8 +266,13 @@ const RequestDetails = () => {
   if (error) {
     return (
       <Container maxWidth="md" sx={{ mt: 4 }}>
-        <Typography color="error" gutterBottom>Error: {error}</Typography>
-        <Button onClick={() => navigate(-1)} startIcon={<ArrowBackIcon />} sx={{ mt: 2 }}>
+        <Alert severity="error">{error}</Alert>
+        <Button 
+          variant="contained" 
+          color="primary" 
+          onClick={() => navigate(-1)}
+          sx={{ mt: 2 }}
+        >
           Go Back
         </Button>
       </Container>
