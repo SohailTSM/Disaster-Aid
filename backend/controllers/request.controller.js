@@ -1,6 +1,6 @@
-const asyncHandler = require('express-async-handler');
-const Request = require('../models/request.model');
-const requestService = require('../services/request.service');
+const asyncHandler = require("express-async-handler");
+const Request = require("../models/request.model");
+const requestService = require("../services/request.service");
 
 // POST /api/requests (public)
 const createRequest = asyncHandler(async (req, res) => {
@@ -14,7 +14,7 @@ const listRequests = asyncHandler(async (req, res) => {
   const filter = {};
   if (status) filter.status = status;
   if (priority) filter.priority = priority;
-  if (isSoS !== undefined) filter.isSoS = isSoS === 'true';
+  if (isSoS !== undefined) filter.isSoS = isSoS === "true";
   const requests = await Request.find(filter).sort({ createdAt: -1 });
   res.json({ requests });
 });
@@ -24,7 +24,7 @@ const getRequest = asyncHandler(async (req, res) => {
   const reqDoc = await Request.findById(req.params.id);
   if (!reqDoc) {
     res.status(404);
-    throw new Error('Request not found');
+    throw new Error("Request not found");
   }
   res.json({ request: reqDoc });
 });
@@ -35,12 +35,33 @@ const updateRequest = asyncHandler(async (req, res) => {
   const reqDoc = await Request.findById(req.params.id);
   if (!reqDoc) {
     res.status(404);
-    throw new Error('Request not found');
+    throw new Error("Request not found");
   }
   if (status) reqDoc.status = status;
   if (notes) reqDoc.notes = notes;
   await reqDoc.save();
-  res.json({ message: 'Request updated', request: reqDoc });
+  res.json({ message: "Request updated", request: reqDoc });
 });
 
-module.exports = { createRequest, listRequests, getRequest, updateRequest };
+// GET /api/requests/by-requestid/:requestId (public)
+const RequestComponent = require("../models/requestComponent.model");
+const getRequestByRequestId = asyncHandler(async (req, res) => {
+  const reqDoc = await Request.findOne({
+    requestId: Number(req.params.requestId),
+  });
+  if (!reqDoc) {
+    res.status(404);
+    throw new Error("Request not found");
+  }
+  // Find all components for this request
+  const components = await RequestComponent.find({ requestId: reqDoc._id });
+  res.json({ request: reqDoc, components });
+});
+
+module.exports = {
+  createRequest,
+  listRequests,
+  getRequest,
+  updateRequest,
+  getRequestByRequestId,
+};
