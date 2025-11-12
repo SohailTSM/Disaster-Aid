@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -49,31 +50,31 @@ import {
 
 // Mock data for the dashboard
 const statsData = [
-  { 
-    title: 'Total Requests', 
-    value: '1,234', 
-    change: 12.5, 
+  {
+    title: 'Total Requests',
+    value: '1,234',
+    change: 12.5,
     icon: <AssignmentIcon fontSize="large" />,
     color: 'primary.main'
   },
-  { 
-    title: 'Active Requests', 
-    value: '45', 
-    change: -2.3, 
+  {
+    title: 'Active Requests',
+    value: '45',
+    change: -2.3,
     icon: <LocalShippingIcon fontSize="large" />,
     color: 'warning.main'
   },
-  { 
-    title: 'Areas Covered', 
-    value: '12', 
-    change: 5.2, 
+  {
+    title: 'Areas Covered',
+    value: '12',
+    change: 5.2,
     icon: <PeopleIcon fontSize="large" />,
     color: 'success.main'
   },
-  { 
-    title: 'Avg. Response Time', 
-    value: '2.5h', 
-    change: -10.8, 
+  {
+    title: 'Avg. Response Time',
+    value: '2.5h',
+    change: -10.8,
     icon: <AccessTimeIcon fontSize="large" />,
     color: 'info.main'
   }
@@ -81,37 +82,37 @@ const statsData = [
 
 // Mock data for NGOs with their capabilities
 const ngos = [
-  { 
-    _id: 'ngo1', 
-    name: 'Food Relief Foundation', 
+  {
+    _id: 'ngo1',
+    name: 'Food Relief Foundation',
     contact: '9876543210',
     capabilities: ['Food', 'Clothing']
   },
-  { 
-    _id: 'ngo2', 
-    name: 'Medical Aid International', 
+  {
+    _id: 'ngo2',
+    name: 'Medical Aid International',
     contact: '9876543211',
     capabilities: ['Medical', 'First Aid']
   },
-  { 
-    _id: 'ngo3', 
-    name: 'Shelter for All', 
+  {
+    _id: 'ngo3',
+    name: 'Shelter for All',
     contact: '9876543212',
     capabilities: ['Shelter', 'Clothing']
   },
-  { 
-    _id: 'ngo4', 
-    name: 'Rapid Response Team', 
+  {
+    _id: 'ngo4',
+    name: 'Rapid Response Team',
     contact: '9876543213',
     capabilities: ['Food', 'Medical', 'Shelter', 'Clothing']
   }
 ];
 
 const recentRequests = [
-  { 
-    id: '#D-12350', 
-    location: 'Hyderabad, Telangana', 
-    status: 'New', 
+  {
+    id: '#D-12350',
+    location: 'Hyderabad, Telangana',
+    status: 'New',
     date: '2023-11-12',
     priority: 'High',
     assignedTo: {},
@@ -124,10 +125,10 @@ const recentRequests = [
     ],
     description: 'Urgent supplies needed for flood-affected families in the area.'
   },
-  { 
-    id: '#D-12349', 
-    location: 'Pune, Maharashtra', 
-    status: 'New', 
+  {
+    id: '#D-12349',
+    location: 'Pune, Maharashtra',
+    status: 'New',
     date: '2023-11-12',
     priority: 'High',
     assignedTo: {},
@@ -140,10 +141,10 @@ const recentRequests = [
     ],
     description: 'Medical camp setup required for temporary shelter residents.'
   },
-  { 
-    id: '#D-12348', 
-    location: 'Mumbai, Maharashtra', 
-    status: 'Partially Assigned', 
+  {
+    id: '#D-12348',
+    location: 'Mumbai, Maharashtra',
+    status: 'Partially Assigned',
     date: '2023-11-12',
     priority: 'High',
     assignedTo: { 'Shelter': 'ngo3' },
@@ -195,9 +196,12 @@ export default function Dispatcher() {
     setSelectedNgo('');
   };
 
+  const navigate = useNavigate();
+
   const handleViewRequest = (request) => {
-    setSelectedRequest(request);
-    setViewDialogOpen(true);
+    navigate(`/request/${request._id || request.id}`, {
+      state: { request }
+    });
   };
 
   const handleAssignRequest = () => {
@@ -218,11 +222,11 @@ export default function Dispatcher() {
     setAllRequests(prevRequests =>
       prevRequests.map(req => {
         if (req.id !== requestId) return req;
-        
-        const updatedNeeds = req.needs.map(need => 
+
+        const updatedNeeds = req.needs.map(need =>
           need.type === needType ? { ...need, assignedTo: ngoId } : need
         );
-        
+
         // Update assignedTo with all current assignments
         const newAssignedTo = {};
         updatedNeeds.forEach(need => {
@@ -230,18 +234,18 @@ export default function Dispatcher() {
             newAssignedTo[need.type] = need.assignedTo;
           }
         });
-        
+
         // Determine status based on assignments
         const totalNeeds = req.needs.length;
         const assignedNeeds = updatedNeeds.filter(n => n.assignedTo).length;
         let status = 'New';
-        
+
         if (assignedNeeds === totalNeeds) {
           status = 'Fully Assigned';
         } else if (assignedNeeds > 0) {
           status = 'Partially Assigned';
         }
-        
+
         return {
           ...req,
           needs: updatedNeeds,
@@ -255,13 +259,13 @@ export default function Dispatcher() {
   const handleMenuClose = () => {
     setAnchorEl(null);
   };
-  
+
   // Filter requests based on status
   useEffect(() => {
     let filtered = [...allRequests];
-    
+
     if (statusFilter === 'assigned') {
-      filtered = filtered.filter(request => 
+      filtered = filtered.filter(request =>
         request.status === 'Fully Assigned' || request.status === 'Partially Assigned'
       );
     } else if (statusFilter === 'unassigned') {
@@ -269,7 +273,7 @@ export default function Dispatcher() {
     } else if (statusFilter === 'partially-assigned') {
       filtered = filtered.filter(request => request.status === 'Partially Assigned');
     }
-    
+
     setFilteredRequests(filtered);
   }, [allRequests, statusFilter]);
 
@@ -286,10 +290,10 @@ export default function Dispatcher() {
     };
 
     return (
-      <Chip 
-        label={status} 
-        color={statusColors[status] || 'default'} 
-        size="small" 
+      <Chip
+        label={status}
+        color={statusColors[status] || 'default'}
+        size="small"
       />
     );
   };
@@ -333,9 +337,9 @@ export default function Dispatcher() {
                 <MenuItem value="partially-assigned">Partially Assigned</MenuItem>
               </Select>
             </FormControl>
-            <Button 
-              startIcon={<RefreshIcon />} 
-              onClick={() => window.location.reload()} 
+            <Button
+              startIcon={<RefreshIcon />}
+              onClick={() => window.location.reload()}
               variant="outlined"
             >
               Refresh
@@ -363,7 +367,7 @@ export default function Dispatcher() {
                     {Object.keys(request.assignedTo || {}).length > 0 ? (
                       Object.entries(request.assignedTo).map(([type, ngoId]) => (
                         <Box key={type} sx={{ mb: 0.5 }}>
-                          <Chip 
+                          <Chip
                             size="small"
                             label={`${type}: ${ngos.find(n => n._id === ngoId)?.name || ngoId}`}
                             sx={{ mr: 0.5, mb: 0.5 }}
@@ -377,7 +381,7 @@ export default function Dispatcher() {
                   <TableCell>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                       {request.needs.map((need, idx) => (
-                        <Chip 
+                        <Chip
                           key={idx}
                           label={`${need.type} (${need.quantity})`}
                           size="small"
@@ -390,15 +394,15 @@ export default function Dispatcher() {
                   <TableCell>{getStatusChip(request.status || 'New')}</TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 1 }}>
-                      <Button 
-                        variant="outlined" 
+                      <Button
+                        variant="outlined"
                         size="small"
                         onClick={() => handleViewRequest(request)}
                       >
                         View
                       </Button>
-                      <Button 
-                        variant="contained" 
+                      <Button
+                        variant="contained"
                         size="small"
                         onClick={() => handleOpenDialog(request)}
                         disabled={request.status !== 'New'}
@@ -447,8 +451,8 @@ export default function Dispatcher() {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button 
-            onClick={handleAssignRequest} 
+          <Button
+            onClick={handleAssignRequest}
             variant="contained"
             disabled={!selectedNgo}
           >
@@ -467,39 +471,39 @@ export default function Dispatcher() {
               <Box sx={{ mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
                 <Typography variant="h6" gutterBottom>Needs Assignment</Typography>
                 <Divider sx={{ mb: 2 }} />
-                
+
                 {selectedRequest.needs.map((need, index) => (
-                  <Box key={index} sx={{ 
-                    mb: 2, 
-                    p: 2, 
-                    border: '1px solid #e0e0e0', 
+                  <Box key={index} sx={{
+                    mb: 2,
+                    p: 2,
+                    border: '1px solid #e0e0e0',
                     borderRadius: 1,
                     backgroundColor: need.assignedTo ? '#e8f5e9' : '#fff'
                   }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                       <Typography variant="subtitle1">
-                        <strong>Type:</strong> {need.type} 
-                        <Chip 
-                          label={need.assignedTo ? 'Assigned' : 'Unassigned'} 
-                          size="small" 
+                        <strong>Type:</strong> {need.type}
+                        <Chip
+                          label={need.assignedTo ? 'Assigned' : 'Unassigned'}
+                          size="small"
                           color={need.assignedTo ? 'success' : 'default'}
                           sx={{ ml: 1 }}
                         />
                       </Typography>
                       {need.assignedTo && (
-                        <Chip 
+                        <Chip
                           label={`Assigned to: ${ngos.find(n => n._id === need.assignedTo)?.name || need.assignedTo}`}
                           color="primary"
                           size="small"
                         />
                       )}
                     </Box>
-                    
+
                     <Box sx={{ mb: 1 }}>
                       <Typography variant="body2"><strong>Items:</strong> {need.items.join(', ')}</Typography>
                       <Typography variant="body2"><strong>Quantity:</strong> {need.quantity} people</Typography>
                     </Box>
-                    
+
                     <FormControl fullWidth size="small" sx={{ mt: 1 }}>
                       <InputLabel>Assign to NGO</InputLabel>
                       <Select
@@ -520,10 +524,10 @@ export default function Dispatcher() {
                           ))}
                       </Select>
                     </FormControl>
-                    
+
                     {need.assignedTo && (
-                      <Button 
-                        size="small" 
+                      <Button
+                        size="small"
                         color="error"
                         onClick={() => handleNeedAssignment(selectedRequest.id, need.type, null)}
                         sx={{ mt: 1 }}
@@ -536,7 +540,7 @@ export default function Dispatcher() {
               </Box>
               <Typography variant="h6" gutterBottom>Request Information</Typography>
               <Divider sx={{ mb: 2 }} />
-              
+
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={6}>
                   <Typography variant="subtitle2" color="textSecondary">Request ID</Typography>
@@ -560,17 +564,17 @@ export default function Dispatcher() {
                 </Grid>
                 <Grid item xs={12} sm={6}>
                   <Typography variant="subtitle2" color="textSecondary">Request Type</Typography>
-                  <Chip 
-                    label={selectedRequest.type} 
-                    size="small" 
+                  <Chip
+                    label={selectedRequest.type}
+                    size="small"
                     sx={{ mt: 0.5 }}
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
                   <Typography variant="subtitle2" color="textSecondary">Priority</Typography>
-                  <Chip 
-                    label={selectedRequest.priority} 
-                    size="small" 
+                  <Chip
+                    label={selectedRequest.priority}
+                    size="small"
                     color={selectedRequest.priority === 'High' ? 'error' : 'default'}
                     sx={{ mt: 0.5 }}
                   />
