@@ -84,10 +84,17 @@ export const AuthProvider = ({ children }) => {
         
         // Update the auth state
         setUser(demoUser);
-        toast.success('Logged in as Demo NGO');
         
-        // Redirect to NGO dashboard
-        safeNavigate('/ngo');
+        // Show success message
+        toast.success('Logged in successfully!');
+        
+        // Use setTimeout to ensure state updates before navigation
+        setTimeout(() => {
+          // Redirect based on user role
+          const redirectPath = demoUser.role === 'dispatcher' ? '/dispatcher' : '/ngo';
+          safeNavigate(redirectPath);
+        }, 0);
+        
         return true;
       }
       
