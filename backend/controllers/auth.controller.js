@@ -127,4 +127,62 @@ const me = asyncHandler(async (req, res) => {
   res.json({ user });
 });
 
-module.exports = { register, login, logout, me };
+// @desc    Refresh token
+// @route   POST /api/auth/refresh-token
+// @access  Public - because token will be in httpOnly cookie
+const refreshToken = asyncHandler(async (req, res) => {
+  const token = req.cookies?.token;
+  
+  if (!token) {
+    res.status(401);
+    throw new Error('No refresh token provided');
+  }
+
+  try {
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    // Get user from the token
+    const user = await User.findById(decoded.id);
+    
+    if (!user) {
+      res.status(401);
+      throw new Error('User not found');
+    }
+
+    // Generate new token
+    const tokenPayload = { 
+      id: user._id, 
+      email: user.email, 
+      role: user.role 
+    };
+    
+    // Set new token in cookie
+    setTokenCookie(res, tokenPayload);
+    
+    res.status(200).json({
+      success: true,
+      token: jwt.sign(tokenPayload, process.env.JWT_SECRET, {
+        expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+      }),
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    console.error('Refresh token error:', error);
+    res.status(401);
+    throw new Error('Invalid refresh token');
+  }
+});
+
+module.exports = {
+  register,
+  login,
+  logout,
+  me,
+  refreshToken,
+};

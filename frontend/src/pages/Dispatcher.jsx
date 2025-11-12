@@ -1,5 +1,8 @@
-import { useEffect, useState } from 'react';
-import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
+import { useEffect, useState, useContext } from 'react';
+// Removed unused router hooks: useParams, useNavigate, Link, useLocation
+import { requestService, organizationService, assignmentService } from '../services/api';
+import { AuthContext } from '../contexts/AuthContext';
+import { toast } from 'react-toastify';
 import {
   Box,
   Button,
@@ -24,164 +27,159 @@ import {
   TableHead,
   TableRow,
   Typography,
-  Avatar,
+  // Avatar, // Not used
   CircularProgress,
   Divider,
   Chip,
-  IconButton
+  // IconButton, // Not used
+  Alert // Added Alert for error handling
 } from '@mui/material';
 import {
   People as PeopleIcon,
   LocalShipping as LocalShippingIcon,
   Assignment as AssignmentIcon,
   AccessTime as AccessTimeIcon,
-  ArrowUpward as ArrowUpwardIcon,
-  ArrowDownward as ArrowDownwardIcon,
-  MoreVert as MoreVertIcon,
-  CheckCircle as CheckCircleIcon,
-  Pending as PendingIcon,
-  Error as ErrorIcon,
+  // ArrowUpward as ArrowUpwardIcon, // Not used
+  // ArrowDownward as ArrowDownwardIcon, // Not used
+  // MoreVert as MoreVertIcon, // Not used
+  // CheckCircle as CheckCircleIcon, // Not used
+  // Pending as PendingIcon, // Not used
+  // Error as ErrorIcon, // Not used
   Add as AddIcon,
-  Search as SearchIcon,
-  FilterList as FilterListIcon,
+  // Search as SearchIcon, // Not used
+  // FilterList as FilterListIcon, // Not used
   Refresh as RefreshIcon
 } from '@mui/icons-material';
 
 
-// Mock data for the dashboard
-const statsData = [
-  {
-    title: 'Total Requests',
-    value: '1,234',
-    change: 12.5,
-    icon: <AssignmentIcon fontSize="large" />,
-    color: 'primary.main'
-  },
-  {
-    title: 'Active Requests',
-    value: '45',
-    change: -2.3,
-    icon: <LocalShippingIcon fontSize="large" />,
-    color: 'warning.main'
-  },
-  {
-    title: 'Areas Covered',
-    value: '12',
-    change: 5.2,
-    icon: <PeopleIcon fontSize="large" />,
-    color: 'success.main'
-  },
-  {
-    title: 'Avg. Response Time',
-    value: '2.5h',
-    change: -10.8,
-    icon: <AccessTimeIcon fontSize="large" />,
-    color: 'info.main'
-  }
-];
+// Status mapping for requests
+const REQUEST_STATUS = {
+  PENDING: 'pending',
+  ASSIGNED: 'assigned',
+  IN_PROGRESS: 'in_progress',
+  COMPLETED: 'completed',
+  CANCELLED: 'cancelled'
+};
 
-// Mock data for NGOs with their capabilities
-const ngos = [
-  {
-    _id: 'ngo1',
-    name: 'Food Relief Foundation',
-    contact: '9876543210',
-    capabilities: ['Food', 'Clothing']
-  },
-  {
-    _id: 'ngo2',
-    name: 'Medical Aid International',
-    contact: '9876543211',
-    capabilities: ['Medical', 'First Aid']
-  },
-  {
-    _id: 'ngo3',
-    name: 'Shelter for All',
-    contact: '9876543212',
-    capabilities: ['Shelter', 'Clothing']
-  },
-  {
-    _id: 'ngo4',
-    name: 'Rapid Response Team',
-    contact: '9876543213',
-    capabilities: ['Food', 'Medical', 'Shelter', 'Clothing']
-  }
-];
+// Priority levels
+const PRIORITY_LEVELS = {
+  LOW: 'low',
+  MEDIUM: 'medium',
+  HIGH: 'high',
+  URGENT: 'urgent'
+};
 
-const recentRequests = [
-  {
-    id: '#D-12350',
-    location: 'Hyderabad, Telangana',
-    status: 'New',
-    date: '2023-11-12',
-    priority: 'High',
-    assignedTo: {},
-    contactName: 'Rajesh Kumar',
-    contactPhone: '9876543210',
-    beneficiaries: 25,
-    needs: [
-      { type: 'Food', items: ['Rice (10kg)', 'Dal (5kg)', 'Cooking Oil (2L)'], quantity: 25, assignedTo: null },
-      { type: 'Shelter', items: ['Tents', 'Blankets'], quantity: 10, assignedTo: null }
-    ],
-    description: 'Urgent supplies needed for flood-affected families in the area.'
-  },
-  {
-    id: '#D-12349',
-    location: 'Pune, Maharashtra',
-    status: 'New',
-    date: '2023-11-12',
-    priority: 'High',
-    assignedTo: {},
-    contactName: 'Dr. Priya Singh',
-    contactPhone: '9876543211',
-    beneficiaries: 15,
-    needs: [
-      { type: 'Medical', items: ['First Aid Kits', 'Medicines', 'Masks'], quantity: 15, assignedTo: null },
-      { type: 'Food', items: ['Biscuits', 'Water Bottles'], quantity: 15, assignedTo: null }
-    ],
-    description: 'Medical camp setup required for temporary shelter residents.'
-  },
-  {
-    id: '#D-12348',
-    location: 'Mumbai, Maharashtra',
-    status: 'Partially Assigned',
-    date: '2023-11-12',
-    priority: 'High',
-    assignedTo: { 'Shelter': 'ngo3' },
-    contactName: 'Amit Patel',
-    contactPhone: '9876543212',
-    beneficiaries: 50,
-    needs: [
-      { type: 'Shelter', items: ['Tents', 'Blankets', 'Mats'], quantity: 25, assignedTo: 'ngo3' },
-      { type: 'Food', items: ['Ready-to-eat meals'], quantity: 50, assignedTo: null }
-    ],
-    description: 'Temporary shelter and food needed for families displaced by recent floods.'
-  }
-];
+// Helper function to format date
+const formatDate = (dateString) => {
+  if (!dateString) return '';
+  const options = { year: 'numeric', month: 'short', day: 'numeric' };
+  return new Date(dateString).toLocaleDateString('en-US', options);
+};
 
-const recentActivity = [
-  { id: 1, action: 'Request #D-12345 assigned to NGO A', time: '2 min ago' },
-  { id: 2, action: 'New request received from Mumbai', time: '15 min ago' },
-  { id: 3, action: 'Request #D-12343 marked as completed', time: '1 hour ago' },
-  { id: 4, action: 'NGO B updated status for request #D-12344', time: '3 hours ago' },
-  { id: 5, action: 'New volunteer registered', time: '5 hours ago' }
-];
+// Helper function to get status color
+const getStatusColor = (status) => {
+  switch (status) {
+    case REQUEST_STATUS.ASSIGNED:
+      return 'info';
+    case REQUEST_STATUS.IN_PROGRESS:
+      return 'warning';
+    case REQUEST_STATUS.COMPLETED:
+      return 'success';
+    case REQUEST_STATUS.CANCELLED:
+      return 'error';
+    case REQUEST_STATUS.PENDING:
+    default:
+      return 'default';
+  }
+};
+
+// Helper function to render a status chip
+const getStatusChip = (status) => {
+  const label = status ? status.replace('_', ' ') : 'Pending';
+  return (
+    <Chip
+      label={label}
+      color={getStatusColor(status)}
+      size="small"
+      sx={{ textTransform: 'capitalize' }}
+    />
+  );
+};
 
 export default function Dispatcher() {
-  const [allRequests, setAllRequests] = useState(recentRequests);
-  const [filteredRequests, setFilteredRequests] = useState(recentRequests);
-  const [loading, setLoading] = useState(false);
+  const { user } = useContext(AuthContext);
+  const [allRequests, setAllRequests] = useState([]);
+  const [filteredRequests, setFilteredRequests] = useState([]);
+  const [ngos, setNgos] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [anchorEl, setAnchorEl] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [selectedNgo, setSelectedNgo] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'assigned', 'unassigned', 'partially-assigned'
+  const [statusFilter, setStatusFilter] = useState('all');
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
-  const [assignments, setAssignments] = useState({});
+  
+  // Stats data is initialized but not rendered in the provided JSX.
+  // Kept for completeness.
+  const [statsData, setStatsData] = useState([
+    { title: 'Total Requests', value: '0', change: 0, icon: <AssignmentIcon fontSize="large" />, color: 'primary.main' },
+    { title: 'Active Requests', value: '0', change: 0, icon: <LocalShippingIcon fontSize="large" />, color: 'warning.main' },
+    { title: 'Areas Covered', value: '0', change: 0, icon: <PeopleIcon fontSize="large" />, color: 'success.main' },
+    { title: 'Avg. Response Time', value: '0h', change: 0, icon: <AccessTimeIcon fontSize="large" />, color: 'info.main' }
+  ]);
+  // recentActivity is initialized but not rendered. Kept for completeness.
+  const [recentActivity, setRecentActivity] = useState([]);
 
-  const handleMenuOpen = (event) => {
-    setAnchorEl(event.currentTarget);
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        // Fetch all requests
+        const requests = await requestService.getRequests();
+        setAllRequests(requests);
+        setFilteredRequests(requests);
+        
+        // Fetch all NGOs
+        const ngoList = await organizationService.getOrganizations();
+        setNgos(ngoList);
+        
+        // Update stats
+        updateStats(requests);
+        
+        // Fetch recent activity (you might need to implement this endpoint)
+        // const activity = await activityService.getRecentActivity();
+        // setRecentActivity(activity);
+        
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        toast.error('Failed to load data. Please try again.');
+        setError('Failed to load data. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, []); // Empty dependency array ensures this runs once on mount
+
+  const updateStats = (requests) => {
+    if (!requests) return;
+    
+    const totalRequests = requests.length;
+    const activeRequests = requests.filter(
+      req => req.status !== REQUEST_STATUS.COMPLETED && req.status !== REQUEST_STATUS.CANCELLED
+    ).length;
+    
+    // Calculate unique areas (simplified)
+    const areas = new Set(requests.map(req => req.location?.city || 'Unknown'));
+    
+    // Update stats
+    setStatsData([
+      { ...statsData[0], value: totalRequests.toString() },
+      { ...statsData[1], value: activeRequests.toString() },
+      { ...statsData[2], value: areas.size.toString() },
+      statsData[3] // Keep response time as is for now
+    ]);
   };
 
   const handleOpenDialog = (request) => {
@@ -195,121 +193,132 @@ export default function Dispatcher() {
     setSelectedRequest(null);
     setSelectedNgo('');
   };
-
-  const navigate = useNavigate();
-
-  const handleViewRequest = (request) => {
-    console.log('Viewing request:', request);
-    const requestId = encodeURIComponent(request.id || request._id); // Encode the ID to handle special characters
-    const url = `/request/${requestId}`;
-    console.log('Navigating to:', url);
+  
+  const handleAssignNGO = async () => {
+    if (!selectedRequest || !selectedNgo) return;
     
-    // Navigate using window.location to avoid React Router issues with special characters
-    window.location.href = url;
-  };
-
-  const handleAssignRequest = () => {
-    if (selectedRequest && selectedNgo) {
-      // Update the request status and assigned NGO
-      setAllRequests(prevRequests =>
-        prevRequests.map(req =>
-          req.id === selectedRequest.id
-            ? { ...req, status: 'Assigned', assignedTo: selectedNgo }
-            : req
-        )
+    try {
+      setLoading(true);
+      
+      // Create assignment
+      const assignmentData = {
+        requestId: selectedRequest._id,
+        organizationId: selectedNgo,
+        assignedBy: user._id,
+        status: 'assigned', // This is the assignment status
+        notes: `Assigned to ${ngos.find(ngo => ngo._id === selectedNgo)?.name || 'NGO'}`
+      };
+      
+      await assignmentService.createAssignment(assignmentData);
+      
+      // Update request status
+      const updatedRequest = await requestService.updateRequest(selectedRequest._id, {
+        status: REQUEST_STATUS.ASSIGNED, // This is the request status
+        updatedBy: user._id
+      });
+      
+      // Update local state
+      const updatedRequests = allRequests.map(req => 
+        req._id === updatedRequest._id ? updatedRequest : req
       );
+      
+      setAllRequests(updatedRequests);
+      // setFilteredRequests(updatedRequests); // Let the useEffect handle filtering
+      updateStats(updatedRequests);
+      
+      toast.success('Successfully assigned request to NGO');
       handleCloseDialog();
+      
+    } catch (error) {
+      console.error('Error assigning request:', error);
+      toast.error(error.response?.data?.message || 'Failed to assign request');
+    } finally {
+      setLoading(false);
     }
   };
-
-  const handleNeedAssignment = (requestId, needType, ngoId) => {
-    setAllRequests(prevRequests =>
-      prevRequests.map(req => {
-        if (req.id !== requestId) return req;
-
-        const updatedNeeds = req.needs.map(need =>
-          need.type === needType ? { ...need, assignedTo: ngoId } : need
-        );
-
-        // Update assignedTo with all current assignments
-        const newAssignedTo = {};
-        updatedNeeds.forEach(need => {
-          if (need.assignedTo) {
-            newAssignedTo[need.type] = need.assignedTo;
-          }
-        });
-
-        // Determine status based on assignments
-        const totalNeeds = req.needs.length;
-        const assignedNeeds = updatedNeeds.filter(n => n.assignedTo).length;
-        let status = 'New';
-
-        if (assignedNeeds === totalNeeds) {
-          status = 'Fully Assigned';
-        } else if (assignedNeeds > 0) {
-          status = 'Partially Assigned';
-        }
-
-        return {
-          ...req,
-          needs: updatedNeeds,
-          assignedTo: newAssignedTo,
-          status: assignedNeeds > 0 ? (assignedNeeds === totalNeeds ? 'Fully Assigned' : 'Partially Assigned') : 'New'
-        };
-      })
-    );
-  };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-  };
-
-  // Filter requests based on status
-  useEffect(() => {
-    let filtered = [...allRequests];
-
-    if (statusFilter === 'assigned') {
-      filtered = filtered.filter(request =>
-        request.status === 'Fully Assigned' || request.status === 'Partially Assigned'
+  
+  // This function is not called by any UI element in the fixed code,
+  // but it's valid logic if you add buttons to change status.
+  const handleStatusChange = async (requestId, newStatus) => {
+    try {
+      setLoading(true);
+      
+      const updatedRequest = await requestService.updateRequestStatus(requestId, { 
+        status: newStatus,
+        updatedBy: user._id 
+      });
+      
+      // Update local state
+      const updatedRequests = allRequests.map(req => 
+        req._id === updatedRequest._id ? updatedRequest : req
       );
-    } else if (statusFilter === 'unassigned') {
-      filtered = filtered.filter(request => request.status === 'New');
-    } else if (statusFilter === 'partially-assigned') {
-      filtered = filtered.filter(request => request.status === 'Partially Assigned');
+      
+      setAllRequests(updatedRequests);
+      updateStats(updatedRequests);
+      toast.success(`Request status updated to ${newStatus}`);
+      
+    } catch (error) {
+      console.error('Error updating request status:', error);
+      toast.error(error.response?.data?.message || 'Failed to update request status');
+    } finally {
+      setLoading(false);
     }
-
+  };
+  
+  // Centralized filter logic
+  const filterRequests = (status) => {
+    setStatusFilter(status);
+    
+    if (status === 'all') {
+      setFilteredRequests(allRequests);
+      return;
+    }
+    
+    const filtered = allRequests.filter(request => {
+      if (status === 'active') {
+        return request.status === REQUEST_STATUS.ASSIGNED || 
+               request.status === REQUEST_STATUS.IN_PROGRESS;
+      }
+      return request.status === status;
+    });
+    
+    setFilteredRequests(filtered);
+  };
+  
+  // Filter requests based on status (runs when allRequests or statusFilter changes)
+  useEffect(() => {
+    if (statusFilter === 'all') {
+      setFilteredRequests(allRequests);
+      return;
+    }
+    
+    const filtered = allRequests.filter(request => {
+      if (statusFilter === 'active') {
+        return request.status === REQUEST_STATUS.ASSIGNED || 
+               request.status === REQUEST_STATUS.IN_PROGRESS;
+      }
+      return request.status === statusFilter;
+    });
+    
     setFilteredRequests(filtered);
   }, [allRequests, statusFilter]);
-
-  const getStatusChip = (status) => {
-    const statusColors = {
-      'New': 'primary',
-      'Assigned': 'warning',
-      'In Progress': 'info',
-      'Pending': 'warning',
-      'Completed': 'success',
-      'Cancelled': 'error',
-      'Fully Assigned': 'success',
-      'Partially Assigned': 'warning'
-    };
-
+  
+  // Loading state for initial fetch
+  if (loading && allRequests.length === 0) {
     return (
-      <Chip
-        label={status}
-        color={statusColors[status] || 'default'}
-        size="small"
-      />
-    );
-  };
-
-  if (loading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="80vh">
         <CircularProgress />
       </Box>
     );
   }
 
+  // Handle opening the "View" dialog
+  const handleViewRequest = (request) => {
+    setSelectedRequest(request);
+    setViewDialogOpen(true);
+  };
+
+  // Error state
   if (error) {
     return (
       <Container maxWidth="md" sx={{ mt: 4 }}>
@@ -324,6 +333,21 @@ export default function Dispatcher() {
         <Typography variant="h4" component="h1">Dispatcher Dashboard</Typography>
       </Box>
 
+      {/* Stats Grid (Data is ready, but UI was missing) */}
+      {/* <Grid container spacing={3} sx={{ mb: 4 }}>
+        {statsData.map((stat, index) => (
+          <Grid item xs={12} sm={6} md={3} key={index}>
+            <Card>
+              <CardContent>
+                <Typography color="textSecondary" gutterBottom>{stat.title}</Typography>
+                <Typography variant="h4">{stat.value}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
+      */}
+
       <Paper elevation={3} sx={{ p: 2, mb: 4 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
           <Typography variant="h6" component="h2">Recent Requests</Typography>
@@ -336,14 +360,15 @@ export default function Dispatcher() {
                 label="Filter by Status"
               >
                 <MenuItem value="all">All Requests</MenuItem>
-                <MenuItem value="assigned">Assigned</MenuItem>
-                <MenuItem value="unassigned">Unassigned</MenuItem>
-                <MenuItem value="partially-assigned">Partially Assigned</MenuItem>
+                <MenuItem value={REQUEST_STATUS.PENDING}>Pending</MenuItem>
+                <MenuItem value="active">Active (Assigned/In Progress)</MenuItem>
+                <MenuItem value={REQUEST_STATUS.COMPLETED}>Completed</MenuItem>
+                <MenuItem value={REQUEST_STATUS.CANCELLED}>Cancelled</MenuItem>
               </Select>
             </FormControl>
             <Button
               startIcon={<RefreshIcon />}
-              onClick={() => window.location.reload()}
+              onClick={() => window.location.reload()} // Simple refresh
               variant="outlined"
             >
               Refresh
@@ -358,44 +383,31 @@ export default function Dispatcher() {
                 <TableCell>Contact</TableCell>
                 <TableCell>Location</TableCell>
                 <TableCell>Beneficiaries</TableCell>
-                <TableCell>Needs</TableCell>
+                <TableCell>Items</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {filteredRequests.map((request) => (
-                <TableRow key={request.id}>
-                  <TableCell>{request.id}</TableCell>
-                  <TableCell>
-                    {Object.keys(request.assignedTo || {}).length > 0 ? (
-                      Object.entries(request.assignedTo).map(([type, ngoId]) => (
-                        <Box key={type} sx={{ mb: 0.5 }}>
-                          <Chip
-                            size="small"
-                            label={`${type}: ${ngos.find(n => n._id === ngoId)?.name || ngoId}`}
-                            sx={{ mr: 0.5, mb: 0.5 }}
-                          />
-                        </Box>
-                      ))
-                    ) : 'Unassigned'}
-                  </TableCell>
-                  <TableCell>{request.location}</TableCell>
-                  <TableCell>N/A</TableCell>
+                <TableRow key={request._id}>
+                  <TableCell>{request._id.substring(0, 8)}...</TableCell>
+                  <TableCell>{request.contactName || 'N/A'}</TableCell>
+                  <TableCell>{request.location?.city || request.location?.address || 'N/A'}</TableCell>
+                  <TableCell>{request.beneficiaries || 'N/A'}</TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                      {request.needs.map((need, idx) => (
+                      {request.items?.map((item, idx) => (
                         <Chip
-                          key={idx}
-                          label={`${need.type} (${need.quantity})`}
+                          key={item._id || idx}
+                          label={`${item.name} (${item.quantity})`}
                           size="small"
-                          color={need.assignedTo ? 'success' : 'default'}
-                          variant={need.assignedTo ? 'filled' : 'outlined'}
+                          variant="outlined"
                         />
                       ))}
                     </Box>
                   </TableCell>
-                  <TableCell>{getStatusChip(request.status || 'New')}</TableCell>
+                  <TableCell>{getStatusChip(request.status)}</TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 1 }}>
                       <Button
@@ -409,9 +421,9 @@ export default function Dispatcher() {
                         variant="contained"
                         size="small"
                         onClick={() => handleOpenDialog(request)}
-                        disabled={request.status !== 'New'}
+                        disabled={request.status !== REQUEST_STATUS.PENDING}
                       >
-                        {request.status === 'New' ? 'Assign' : 'Assigned'}
+                        {request.status === REQUEST_STATUS.PENDING ? 'Assign' : 'Assigned'}
                       </Button>
                     </Box>
                   </TableCell>
@@ -422,6 +434,7 @@ export default function Dispatcher() {
         </TableContainer>
       </Paper>
 
+      {/* Assign NGO Dialog */}
       <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
         <DialogTitle>Assign Request to NGO</DialogTitle>
         <DialogContent>
@@ -431,9 +444,9 @@ export default function Dispatcher() {
             </Typography>
             <Typography variant="body2" color="text.secondary" paragraph>
               <strong>Contact:</strong> {selectedRequest?.contactName} ({selectedRequest?.contactPhone})<br />
-              <strong>Location:</strong> {selectedRequest?.location}<br />
+              <strong>Location:</strong> {selectedRequest?.location?.address}<br />
               <strong>Beneficiaries:</strong> {selectedRequest?.beneficiaries}<br />
-              <strong>Needs:</strong> {selectedRequest?.needs?.join(', ')}
+              <strong>Items:</strong> {selectedRequest?.items?.map(item => `${item.name} (${item.quantity})`).join(', ') || 'N/A'}
             </Typography>
 
             <FormControl fullWidth sx={{ mt: 2 }}>
@@ -456,169 +469,277 @@ export default function Dispatcher() {
         <DialogActions>
           <Button onClick={handleCloseDialog}>Cancel</Button>
           <Button
-            onClick={handleAssignRequest}
+            onClick={handleAssignNGO} // Corrected function call
             variant="contained"
-            disabled={!selectedNgo}
+            disabled={!selectedNgo || loading}
           >
-            Assign
+            {loading ? <CircularProgress size={24} /> : 'Assign'}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* View Request Dialog */}
       <Dialog open={viewDialogOpen} onClose={handleCloseDialog} maxWidth="md" fullWidth>
-        <DialogTitle>Request Details - {selectedRequest?.id}</DialogTitle>
+        <DialogTitle>Request Details</DialogTitle>
         <DialogContent>
-          {selectedRequest && (
-            <Box sx={{ mt: 2 }}>
-              {/* Needs Assignment Section */}
-              <Box sx={{ mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                <Typography variant="h6" gutterBottom>Needs Assignment</Typography>
-                <Divider sx={{ mb: 2 }} />
-
-                {selectedRequest.needs.map((need, index) => (
-                  <Box key={index} sx={{
-                    mb: 2,
-                    p: 2,
-                    border: '1px solid #e0e0e0',
-                    borderRadius: 1,
-                    backgroundColor: need.assignedTo ? '#e8f5e9' : '#fff'
-                  }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                      <Typography variant="subtitle1">
-                        <strong>Type:</strong> {need.type}
-                        <Chip
-                          label={need.assignedTo ? 'Assigned' : 'Unassigned'}
-                          size="small"
-                          color={need.assignedTo ? 'success' : 'default'}
-                          sx={{ ml: 1 }}
-                        />
-                      </Typography>
-                      {need.assignedTo && (
-                        <Chip
-                          label={`Assigned to: ${ngos.find(n => n._id === need.assignedTo)?.name || need.assignedTo}`}
-                          color="primary"
-                          size="small"
-                        />
-                      )}
-                    </Box>
-
-                    <Box sx={{ mb: 1 }}>
-                      <Typography variant="body2"><strong>Items:</strong> {need.items.join(', ')}</Typography>
-                      <Typography variant="body2"><strong>Quantity:</strong> {need.quantity} people</Typography>
-                    </Box>
-
-                    <FormControl fullWidth size="small" sx={{ mt: 1 }}>
-                      <InputLabel>Assign to NGO</InputLabel>
-                      <Select
-                        value={need.assignedTo || ''}
-                        label="Assign to NGO"
-                        onChange={(e) => handleNeedAssignment(selectedRequest.id, need.type, e.target.value)}
-                        disabled={!!need.assignedTo}
-                      >
-                        <MenuItem value="">
-                          <em>Select NGO</em>
-                        </MenuItem>
-                        {ngos
-                          .filter(ngo => ngo.capabilities.includes(need.type))
-                          .map((ngo) => (
-                            <MenuItem key={ngo._id} value={ngo._id}>
-                              {ngo.name} ({ngo.contact})
-                            </MenuItem>
-                          ))}
-                      </Select>
-                    </FormControl>
-
-                    {need.assignedTo && (
-                      <Button
-                        size="small"
-                        color="error"
-                        onClick={() => handleNeedAssignment(selectedRequest.id, need.type, null)}
-                        sx={{ mt: 1 }}
-                      >
-                        Unassign
-                      </Button>
-                    )}
+          {selectedRequest ? (
+            <Box>
+              <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
+                <Box>
+                  <Typography variant="h6" gutterBottom>
+                    #{selectedRequest.requestId || selectedRequest._id?.substring(0, 8)} - {selectedRequest.location?.address}
+                  </Typography>
+                  <Box display="flex" flexWrap="wrap" gap={1} mb={2}>
+                    {getStatusChip(selectedRequest.status)}
+                    <Chip 
+                      label={selectedRequest.priority || 'Medium'} 
+                      color={
+                        selectedRequest.priority === PRIORITY_LEVELS.HIGH || selectedRequest.priority === PRIORITY_LEVELS.URGENT 
+                          ? 'error' : 'default'
+                      }
+                      variant="outlined"
+                      size="small"
+                      sx={{ textTransform: 'capitalize' }}
+                    />
                   </Box>
-                ))}
+                </Box>
+                <Box textAlign="right">
+                  <Typography variant="caption" color="textSecondary" display="block">
+                    Created: {formatDate(selectedRequest.createdAt)}
+                  </Typography>
+                  {selectedRequest.updatedAt !== selectedRequest.createdAt && (
+                    <Typography variant="caption" color="textSecondary">
+                      Updated: {formatDate(selectedRequest.updatedAt)}
+                    </Typography>
+                  )}
+                </Box>
               </Box>
-              <Typography variant="h6" gutterBottom>Request Information</Typography>
-              <Divider sx={{ mb: 2 }} />
-
+              
               <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" color="textSecondary">Request ID</Typography>
-                  <Typography variant="body1" gutterBottom>{selectedRequest.id}</Typography>
+                <Grid item xs={12} md={6}>
+                  <Card variant="outlined" sx={{ mb: 2 }}>
+                    <CardContent>
+                      <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'medium' }}>
+                        Request Information
+                      </Typography>
+                      <Divider sx={{ mb: 2 }} />
+                      
+                      <Box mb={2}>
+                        <Typography variant="subtitle2" color="textSecondary">Description</Typography>
+                        <Typography variant="body1" paragraph>
+                          {selectedRequest.description || 'No description provided'}
+                        </Typography>
+                      </Box>
+                      
+                      <Grid container spacing={2}>
+                        <Grid item xs={6}>
+                          <Typography variant="subtitle2" color="textSecondary">Contact Name</Typography>
+                          <Typography variant="body1">
+                            {selectedRequest.contactName || 'N/A'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="subtitle2" color="textSecondary">Contact Phone</Typography>
+                          <Typography variant="body1">
+                            {selectedRequest.contactPhone || 'N/A'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12}>
+                          <Typography variant="subtitle2" color="textSecondary">Email</Typography>
+                          <Typography variant="body1">
+                            {selectedRequest.contactEmail || 'N/A'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="subtitle2" color="textSecondary">Beneficiaries</Typography>
+                          <Typography variant="body1">
+                            {selectedRequest.beneficiaries || 0}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12}>
+                          <Typography variant="subtitle2" color="textSecondary">Location</Typography>
+                          <Typography variant="body1">
+                            {selectedRequest.location?.address || 'N/A'}
+                            {selectedRequest.location?.city && `, ${selectedRequest.location.city}`}
+                            {selectedRequest.location?.state && `, ${selectedRequest.location.state}`}
+                            {selectedRequest.location?.pincode && ` - ${selectedRequest.location.pincode}`}
+                          </Typography>
+                        </Grid>
+                      </Grid>
+                    </CardContent>
+                  </Card>
                 </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" color="textSecondary">Status</Typography>
-                  <Box sx={{ display: 'inline-block' }}>
-                    {selectedRequest.status === 'Fully Assigned' ? (
-                      <Chip label="Fully Assigned" color="success" size="small" />
-                    ) : selectedRequest.status === 'Partially Assigned' ? (
-                      <Chip label="Partially Assigned" color="warning" size="small" />
-                    ) : (
-                      <Chip label="New" size="small" />
-                    )}
-                  </Box>
-                </Grid>
-                <Grid item xs={12}>
-                  <Typography variant="subtitle2" color="textSecondary">Location</Typography>
-                  <Typography variant="body1" gutterBottom>{selectedRequest.location}</Typography>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" color="textSecondary">Request Type</Typography>
-                  <Chip
-                    label={selectedRequest.type}
-                    size="small"
-                    sx={{ mt: 0.5 }}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" color="textSecondary">Priority</Typography>
-                  <Chip
-                    label={selectedRequest.priority}
-                    size="small"
-                    color={selectedRequest.priority === 'High' ? 'error' : 'default'}
-                    sx={{ mt: 0.5 }}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" color="textSecondary">Date</Typography>
-                  <Typography variant="body1" gutterBottom>{selectedRequest.date}</Typography>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" color="textSecondary">Assigned To</Typography>
-                  <Typography variant="body1" gutterBottom>
-                    {selectedRequest.assignedTo || 'Unassigned'}
-                  </Typography>
-                </Grid>
-                <Grid item xs={12}>
-                  <Typography variant="subtitle2" color="textSecondary">Description</Typography>
-                  <Typography variant="body1" gutterBottom>
-                    {selectedRequest.description || 'No description available'}
-                  </Typography>
+                
+                <Grid item xs={12} md={6}>
+                  <Card variant="outlined">
+                    <CardContent>
+                      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>
+                          Required Items
+                        </Typography>
+                        {selectedRequest.status !== REQUEST_STATUS.COMPLETED && (
+                          <Button 
+                            size="small" 
+                            variant="outlined" 
+                            startIcon={<AddIcon />}
+                            onClick={() => {
+                              toast.info('Add items functionality would be implemented here');
+                            }}
+                          >
+                            Add Items
+                          </Button>
+                        )}
+                      </Box>
+                      <Divider sx={{ mb: 2 }} />
+                      
+                      {selectedRequest.items?.length > 0 ? (
+                        <Box>
+                          {selectedRequest.items.map((item, index) => (
+                            <Box 
+                              key={item._id || index} 
+                              mb={2} 
+                              p={1.5} 
+                              bgcolor="grey.50" 
+                              borderRadius={1}
+                              border="1px solid"
+                              borderColor="divider"
+                            >
+                              <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+                                <Box>
+                                  <Typography variant="subtitle2">
+                                    {item.name} - {item.quantity} {item.unit || 'units'}
+                                  </Typography>
+                                  {item.description && (
+                                    <Typography variant="body2" color="textSecondary" paragraph>
+                                      {item.description}
+                                    </Typography>
+                                  )}
+                                  <Typography variant="caption" color="textSecondary">
+                                    Category: {item.category || 'General'}
+                                  </Typography>
+                                </Box>
+                                
+                                <Box>
+                                  {/* Item status chip (if item has its own status) */}
+                                  {item.status && getStatusChip(item.status)}
+                                </Box>
+                              </Box>
+                              
+                              {/* This logic was for Model 2 (item-level assignment).
+                                In Model 1, the whole request is assigned.
+                                We'll show the main assignment details in the 'Assignments' card below.
+                              */}
+                              
+                              {/* Button to assign a single item (Model 2 logic) */}
+                              {/* {selectedRequest.status === REQUEST_STATUS.PENDING && (
+                                <Box mt={1} display="flex" justifyContent="flex-end">
+                                  <Button 
+                                    size="small" 
+                                    variant="outlined"
+                                    onClick={() => {
+                                      // This re-uses the main dialog
+                                      setSelectedRequest(selectedRequest);
+                                      setSelectedNgo('');
+                                      setDialogOpen(true);
+                                      setViewDialogOpen(false);
+                                    }}
+                                  >
+                                    Assign NGO
+                                  </Button>
+                                </Box>
+                              )}
+                              */}
+                            </Box>
+                          ))}
+                        </Box>
+                      ) : (
+                        <Box textAlign="center" py={2}>
+                          <Typography color="textSecondary">No items added to this request</Typography>
+                          {selectedRequest.status !== REQUEST_STATUS.COMPLETED && (
+                            <Button 
+                              size="small" 
+                              variant="text" 
+                              startIcon={<AddIcon />}
+                              onClick={() => {
+                                toast.info('Add items functionality would be implemented here');
+                              }}
+                              sx={{ mt: 1 }}
+                            >
+                              Add Items
+                            </Button>
+                          )}
+                        </Box>
+                      )}
+                    </CardContent>
+                  </Card>
+                  
+                  {/* Assignments Section */}
+                  {selectedRequest.assignments?.length > 0 && (
+                    <Card variant="outlined" sx={{ mt: 2 }}>
+                      <CardContent>
+                        <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'medium' }}>
+                          Assignments
+                        </Typography>
+                        <Divider sx={{ mb: 2 }} />
+                        
+                        <Stack spacing={2}>
+                          {selectedRequest.assignments.map((assignment) => (
+                            <Box 
+                              key={assignment._id} 
+                              p={1.5} 
+                              border="1px solid" 
+                              borderColor="divider" 
+                              borderRadius={1}
+                            >
+                              <Box display="flex" justifyContent="space-between" alignItems="center">
+                                <Box>
+                                  <Typography variant="subtitle2">
+                                    {assignment.organization?.name || 'NGO'}
+                                  </Typography>
+                                  <Typography variant="body2" color="textSecondary">
+                                    Assigned by: {assignment.assignedBy?.name || 'System'}
+                                  </Typography>
+                                  <Typography variant="caption" color="textSecondary">
+                                    {formatDate(assignment.assignedAt)}
+                                  </Typography>
+                                </Box>
+                                {getStatusChip(assignment.status)}
+                              </Box>
+                              
+                              {assignment.notes && (
+                                <Box mt={1} pt={1} borderTop="1px dashed" borderColor="divider">
+                                  <Typography variant="body2">
+                                    {assignment.notes}
+                                  </Typography>
+                                </Box>
+                              )}
+                              
+                              {assignment.updatedAt !== assignment.createdAt && (
+                                <Typography variant="caption" color="textSecondary" display="block" mt={1}>
+                                  Last updated: {formatDate(assignment.updatedAt)}
+                                </Typography>
+                              )}
+                            </Box>
+                          ))}
+                        </Stack>
+                        
+                        {/* This section was from the broken merge.
+                          It tried to add assignment logic *within* the view dialog.
+                          This logic is now handled by the main "Assign" button in the table.
+                        */}
+
+                      </CardContent>
+                    </Card>
+                  )}
                 </Grid>
               </Grid>
+              
+              {/* This entire Box was the start of the duplicated dialog content. Removed. */}
 
-              <Box sx={{ mt: 3 }}>
-                <Typography variant="h6" gutterBottom>Contact Information</Typography>
-                <Divider sx={{ mb: 2 }} />
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6}>
-                    <Typography variant="subtitle2" color="textSecondary">Contact Person</Typography>
-                    <Typography variant="body1" gutterBottom>
-                      {selectedRequest.contactName || 'N/A'}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <Typography variant="subtitle2" color="textSecondary">Contact Number</Typography>
-                    <Typography variant="body1" gutterBottom>
-                      {selectedRequest.contactPhone || 'N/A'}
-                    </Typography>
-                  </Grid>
-                </Grid>
-              </Box>
+            </Box>
+          ) : (
+            <Box display="flex" justifyContent="center" alignItems="center" minHeight="40vh">
+              <CircularProgress />
             </Box>
           )}
         </DialogContent>

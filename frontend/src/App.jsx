@@ -63,20 +63,12 @@ function AppContent() {
       <Navbar />
       <Routes>
         {/* Public Routes - Accessible to everyone */}
+        <Route path="/" element={<RequestForm />} />
+        <Route path="/request-help" element={<RequestForm />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         
         {/* Protected Routes */}
-        <Route path="/" element={
-          <ProtectedRoute>
-            <RequestForm />
-          </ProtectedRoute>
-        } />
-        <Route path="/request-help" element={
-          <ProtectedRoute>
-            <RequestForm />
-          </ProtectedRoute>
-        } />
         <Route
           path="/dispatcher"
           element={

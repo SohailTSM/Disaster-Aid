@@ -8,6 +8,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [navigateTo, setNavigateTo] = useState(null);
+  const [token, setToken] = useState(localStorage.getItem('token'));
 
   // This will be called by the RouterProvider after the router is set up
   const setNavigate = useCallback((navigate) => {
@@ -23,210 +24,111 @@ export const AuthProvider = ({ children }) => {
     }
   }, [navigateTo]);
 
-  // Create a default NGO user for testing
-  const createDefaultUser = () => {
-    const defaultUser = {
-      id: 'demo-ngo-1',
-      name: 'Demo NGO',
-      email: 'demo@ngo.org',
-      role: 'ngo',
-      organization: 'Demo NGO Foundation',
-      contact: 'contact@demo.org'
-    };
-    
-    // Store in demo users if not exists
-    const users = JSON.parse(localStorage.getItem('demo_users') || '[]');
-    if (!users.some(u => u.email === defaultUser.email)) {
-      users.push(defaultUser);
-      localStorage.setItem('demo_users', JSON.stringify(users));
+  // Load user data from token
+  const loadUser = useCallback(async () => {
+    try {
+      // In a real app, you might want to validate the token with the server
+      const userData = JSON.parse(localStorage.getItem('user'));
+      if (userData) {
+        setUser(userData);
+      }
+    } catch (error) {
+      console.error('Error loading user data', error);
+      logout();
+    } finally {
+      setLoading(false);
     }
-    
-    return defaultUser;
-  };
+  }, []);
 
   useEffect(() => {
-    // Create default user for testing
-    createDefaultUser();
-    
-    const token = localStorage.getItem('token');
     if (token) {
-      try {
-        // In a real app, you might want to validate the token with the server
-        const userData = JSON.parse(localStorage.getItem('user'));
-        setUser(userData);
-      } catch (error) {
-        console.error('Error parsing user data', error);
-        logout();
-      }
+      loadUser();
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
-  }, []);
+  }, [token, loadUser]);
 
   const login = async (email, password) => {
     try {
-      // Demo NGO user
-      if (email === 'git') {
-        const demoUser = {
-          id: 'demo-ngo-1',
-          name: 'Demo NGO',
-          email: 'demo@ngo.org',
-          role: 'ngo',
-          organization: 'Demo NGO Foundation',
-          contact: 'contact@demo.org'
-        };
-        
-        // Generate a simple token for demo
-        const token = btoa(JSON.stringify(demoUser));
-        
-        // Store the token and user data
-        localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify(demoUser));
-        
-        // Update the auth state
-        setUser(demoUser);
-        
-        // Show success message
-        toast.success('Logged in as Demo NGO!');
-        
-        // Use setTimeout to ensure state updates before navigation
-        setTimeout(() => {
-          safeNavigate('/ngo');
-        }, 0);
-        
-        return true;
-      }
+      const response = await authService.login(email, password);
+      const { token: authToken, user: userData } = response;
       
-      // Demo Dispatcher user
-      if (email === 'dispatcher@demo.org') {
-        const demoDispatcher = {
-          id: 'demo-dispatcher-1',
-          name: 'Demo Dispatcher',
-          email: 'dispatcher@demo.org',
-          role: 'dispatcher',
-          department: 'Emergency Response',
-          contact: 'dispatcher@demo.org'
-        };
-        
-        // Generate a simple token for demo
-        const token = btoa(JSON.stringify(demoDispatcher));
-        
-        // Store the token and user data
-        localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify(demoDispatcher));
-        
-        // Update the auth state
-        setUser(demoDispatcher);
-        
-        // Show success message
-        toast.success('Logged in as Demo Dispatcher!');
-        
-        // Use setTimeout to ensure state updates before navigation
-        setTimeout(() => {
-          safeNavigate('/dispatcher');
-        }, 0);
-        
-        return true;
-      }
+      // Store token and user data
+      localStorage.setItem('token', authToken);
+      localStorage.setItem('user', JSON.stringify(userData));
       
-      // For other users, check against stored users
-      const users = JSON.parse(localStorage.getItem('demo_users') || '[]');
-      const user = users.find(u => u.email === email);
+      // Update state
+      setToken(authToken);
+      setUser(userData);
       
-      if (!user) {
-        throw new Error('No user found with this email');
-      }
+      // Show success message
+      toast.success(`Welcome back, ${userData.name || 'User'}!`);
       
-      // In a real app, we would verify the password here
-      // For demo, we'll just check if any password was provided
-      if (!password) {
-        throw new Error('Invalid password');
-      }
-      
-      // Generate a simple token for demo
-      const token = btoa(JSON.stringify(user));
-      
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
-      
-      setUser(user);
-      toast.success('Login successful');
-      
-      // Redirect based on user role
-      const redirectPath = user.role === 'dispatcher' ? '/dispatcher' : '/ngo';
-      safeNavigate(redirectPath);
-      return true;
+      // Return the user data for role-based routing
+      return userData;
     } catch (error) {
-      console.error('Login failed:', error);
-      toast.error(error.message || 'Login failed. Please check your credentials.');
+      console.error('Login error:', error);
+      toast.error(error.response?.data?.message || 'Login failed. Please try again.');
       return false;
-    } finally {
-      setLoading(false);
     }
   };
-
+  
   const register = async (userData) => {
     try {
-      // For demo purposes, we'll create a mock user object
-      const mockUser = {
-        id: Date.now().toString(),
-        name: userData.name,
-        email: userData.email,
-        role: userData.role || 'ngo',
-        organization: userData.organization || '',
-        contact: userData.contact || ''
-      };
+      const response = await authService.register(userData);
+      const { token: authToken, user: registeredUser } = response;
       
-      // Generate a simple token for demo
-      const token = btoa(JSON.stringify(mockUser));
+      // Store token and user data
+      localStorage.setItem('token', authToken);
+      localStorage.setItem('user', JSON.stringify(registeredUser));
       
-      // Get existing users or initialize empty array
-      const users = JSON.parse(localStorage.getItem('demo_users') || '[]');
+      // Update state
+      setToken(authToken);
+      setUser(registeredUser);
       
-      // Check if user already exists
-      if (users.some(u => u.email === userData.email)) {
-        throw new Error('User with this email already exists');
-      }
+      // Show success message
+      toast.success('Registration successful!');
       
-      // Add new user
-      users.push(mockUser);
-      localStorage.setItem('demo_users', JSON.stringify(users));
-      
-      // Log the user in
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(mockUser));
-      
-      setUser(mockUser);
-      toast.success('Registration successful');
-      
-      // Redirect based on user role
-      const redirectPath = mockUser.role === 'dispatcher' ? '/dispatcher' : '/ngo';
+      // Redirect based on role
+      const redirectPath = registeredUser.role === 'ngo' ? '/ngo' : '/';
       safeNavigate(redirectPath);
+      
       return true;
     } catch (error) {
-      console.error('Registration failed:', error);
-      const errorMessage = error.response?.data?.message || 
-                         error.message || 
-                         'Registration failed. Please try again.';
-      toast.error(errorMessage);
+      console.error('Registration error:', error);
+      toast.error(error.response?.data?.message || 'Registration failed. Please try again.');
       return false;
-    } finally {
-      setLoading(false);
     }
   };
-
+  
   const logout = () => {
+    // Clear local storage
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    
+    // Reset state
+    setToken(null);
     setUser(null);
+    
+    // Redirect to login
     safeNavigate('/login');
   };
-
-  const isAuthenticated = () => {
-    return !!user;
-  };
-
+  
+  const isAuthenticated = useCallback(() => {
+    // Check both token and user data
+    const storedToken = localStorage.getItem('token');
+    const storedUser = localStorage.getItem('user');
+    return !!(storedToken && storedUser);
+  }, []);
+  
   const hasRole = (role) => {
-    return user?.role === role;
+    return user?.role === role || user?.roles?.includes(role);
+  };
+  
+  const hasAnyRole = (roles) => {
+    if (!user) return false;
+    return roles.includes(user.role) || 
+           (Array.isArray(user.roles) && user.roles.some(r => roles.includes(r)));
   };
 
   return (
@@ -239,10 +141,11 @@ export const AuthProvider = ({ children }) => {
         logout,
         isAuthenticated,
         hasRole,
-        setNavigate, // Add setNavigate to the context value
+        hasAnyRole,
+        setNavigate, // Expose setNavigate for the router
       }}
     >
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 };

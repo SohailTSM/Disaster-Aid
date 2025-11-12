@@ -43,9 +43,16 @@ export default function Login() {
     try {
       setError('');
       setLoading(true);
-      await login(data.email, data.password);
-      // Redirect based on user role or to home
-      navigate('/');
+      const user = await login(data.email, data.password);
+      
+      // Redirect based on user role
+      if (user?.role === 'dispatcher') {
+        navigate('/dispatcher');
+      } else if (user?.role === 'ngo') {
+        navigate('/ngo');
+      } else {
+        navigate('/');
+      }
     } catch (err) {
       setError('Failed to log in. Please check your credentials.');
       console.error('Login error:', err);
