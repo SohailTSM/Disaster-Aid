@@ -1,0 +1,79 @@
+# =========================
+# Global ignores
+# =========================
+node_modules/
+.env
+.env.local
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# =========================
+# Frontend
+# =========================
+frontend/node_modules/
+frontend/.env
+frontend/.env.local
+frontend/.next/
+frontend/build/
+frontend/dist/
+frontend/coverage/
+frontend/.turbo/
+frontend/.cache/
+frontend/.eslintcache
+
+# React or Vite specific
+frontend/.vite/
+frontend/.parcel-cache/
+frontend/public/static/
+frontend/.sass-cache/
+frontend/*.local
+
+# =========================
+# Backend
+# =========================
+backend/node_modules/
+backend/.env
+backend/.env.local
+backend/dist/
+backend/build/
+backend/coverage/
+backend/.cache/
+backend/uploads/
+backend/tmp/
+backend/.eslintcache
+
+# Logs
+backend/logs/
+frontend/logs/
+
+# =========================
+# IDE / Editor files
+# =========================
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# =========================
+# OS-specific files
+# =========================
+ehthumbs.db
+Icon?
+__MACOSX/
+
+# =========================
+# Optional: Ignore reports or test outputs
+# =========================
+reports/
+test-output/
+coverage/
