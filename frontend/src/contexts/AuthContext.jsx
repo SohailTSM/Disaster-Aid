@@ -64,7 +64,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      // For demo purposes, we'll use a hardcoded demo user
+      // Demo NGO user
       if (email === 'demo@ngo.org') {
         const demoUser = {
           id: 'demo-ngo-1',
@@ -86,13 +86,43 @@ export const AuthProvider = ({ children }) => {
         setUser(demoUser);
         
         // Show success message
-        toast.success('Logged in successfully!');
+        toast.success('Logged in as Demo NGO!');
         
         // Use setTimeout to ensure state updates before navigation
         setTimeout(() => {
-          // Redirect based on user role
-          const redirectPath = demoUser.role === 'dispatcher' ? '/dispatcher' : '/ngo';
-          safeNavigate(redirectPath);
+          safeNavigate('/ngo');
+        }, 0);
+        
+        return true;
+      }
+      
+      // Demo Dispatcher user
+      if (email === 'dispatcher@demo.org') {
+        const demoDispatcher = {
+          id: 'demo-dispatcher-1',
+          name: 'Demo Dispatcher',
+          email: 'dispatcher@demo.org',
+          role: 'dispatcher',
+          department: 'Emergency Response',
+          contact: 'dispatcher@demo.org'
+        };
+        
+        // Generate a simple token for demo
+        const token = btoa(JSON.stringify(demoDispatcher));
+        
+        // Store the token and user data
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(demoDispatcher));
+        
+        // Update the auth state
+        setUser(demoDispatcher);
+        
+        // Show success message
+        toast.success('Logged in as Demo Dispatcher!');
+        
+        // Use setTimeout to ensure state updates before navigation
+        setTimeout(() => {
+          safeNavigate('/dispatcher');
         }, 0);
         
         return true;

@@ -39,25 +39,30 @@ export default function Navbar() {
             variant="h6"
             noWrap
             component={RouterLink}
-            to="/"
+            to={isAuthenticated() ? (user?.role === 'dispatcher' ? '/dispatcher' : '/ngo') : '/'}
             sx={{
               mr: 2,
               fontWeight: 700,
               color: 'inherit',
               textDecoration: 'none',
+              '&:hover': {
+                opacity: 0.9
+              }
             }}
           >
             DisasterAid
           </Typography>
 
           <Box sx={{ flexGrow: 1, display: 'flex', ml: 3 }}>
-            <Button
-              component={RouterLink}
-              to="/"
-              sx={{ my: 2, color: 'white', display: 'block' }}
-            >
-              Request Help
-            </Button>
+            {!isAuthenticated() && (
+              <Button
+                component={RouterLink}
+                to="/"
+                sx={{ my: 2, color: 'white', display: 'block' }}
+              >
+                Request Help
+              </Button>
+            )}
             
             {isAuthenticated() && user?.role === 'dispatcher' && (
               <Button
