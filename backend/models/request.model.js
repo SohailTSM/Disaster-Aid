@@ -21,13 +21,28 @@ const requestSchema = new Schema({
     coordinates: { type: [], required: true }, // [lng, lat] or polygon coordinates
   },
   addressText: { type: String },
+  additionalAddressDetails: { type: String }, // Optional additional address info
   needs: [
-    { type: String, enum: ["rescue", "food", "water", "medical", "shelter"] },
+    {
+      type: String,
+      enum: [
+        "rescue",
+        "food",
+        "water",
+        "medical",
+        "shelter",
+        "baby_supplies",
+        "sanitation",
+        "transport",
+        "power_charging",
+      ],
+    },
   ],
   beneficiaries_adults: { type: Number, default: 0 },
   beneficiaries_children: { type: Number, default: 0 },
   beneficiaries_elderly: { type: Number, default: 0 },
   specialNeeds: { type: String },
+  evidence: [{ type: String }], // Array of file URLs/paths for images/videos
   priority: {
     type: String,
     enum: ["low", "medium", "high", "sos"],
@@ -39,6 +54,9 @@ const requestSchema = new Schema({
     enum: ["web_form", "call_center"],
     default: "web_form",
   },
+  // Device information
+  deviceBattery: { type: Number }, // Battery percentage (0-100)
+  deviceNetwork: { type: Number }, // Network strength (0-4)
   createdAt: { type: Date, default: Date.now },
 });
 
