@@ -215,4 +215,37 @@ export const userService = {
   },
 };
 
+export const advisoryService = {
+  // Get active advisories (public)
+  getActiveAdvisories: async () => {
+    const response = await api.get("/advisories");
+    return response.data;
+  },
+  // Get all advisories (authority)
+  getAllAdvisories: async () => {
+    const response = await api.get("/advisories/all");
+    return response.data;
+  },
+  // Create advisory (authority)
+  createAdvisory: async (advisoryData) => {
+    const response = await api.post("/advisories", advisoryData);
+    return response.data;
+  },
+  // Update advisory (authority)
+  updateAdvisory: async (id, advisoryData) => {
+    const response = await api.put(`/advisories/${id}`, advisoryData);
+    return response.data;
+  },
+  // Delete advisory (authority)
+  deleteAdvisory: async (id) => {
+    const response = await api.delete(`/advisories/${id}`);
+    return response.data;
+  },
+  // Toggle advisory status (authority)
+  toggleAdvisoryStatus: async (id) => {
+    const response = await api.put(`/advisories/${id}/toggle`);
+    return response.data;
+  },
+};
+
 export default api;

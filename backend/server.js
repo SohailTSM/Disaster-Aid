@@ -17,6 +17,7 @@ const orgRoutes = require("./routes/organizations.routes");
 const reqRoutes = require("./routes/requests.routes");
 const assignRoutes = require("./routes/assignments.routes");
 const userRoutes = require("./routes/users.routes");
+const advisoryRoutes = require("./routes/advisories.routes");
 
 // Initialize express app
 const app = express();
@@ -99,6 +100,7 @@ app.use("/api/organizations", orgRoutes);
 app.use("/api/requests", reqRoutes);
 app.use("/api/assignments", assignRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/advisories", advisoryRoutes);
 
 app.use(errorHandler);
 

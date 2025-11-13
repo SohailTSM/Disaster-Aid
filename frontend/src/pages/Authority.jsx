@@ -45,7 +45,7 @@ import {
   HourglassEmpty as PendingIcon,
   LocalShipping as InProgressIcon,
 } from "@mui/icons-material";
-import { requestService } from "../services/api";
+import { requestService, advisoryService } from "../services/api";
 import { toast } from "react-toastify";
 
 const Authority = () => {
@@ -61,26 +61,7 @@ const Authority = () => {
   });
 
   // Advisory state
-  const [advisories, setAdvisories] = useState([
-    {
-      id: 1,
-      title: "Flood Alert - Northern Districts",
-      content:
-        "Heavy rainfall expected. Residents advised to move to higher ground.",
-      severity: "High",
-      createdAt: new Date().toISOString(),
-      active: true,
-    },
-    {
-      id: 2,
-      title: "Emergency Shelter Locations",
-      content:
-        "Three emergency shelters opened at City Hall, Central School, and Community Center.",
-      severity: "Medium",
-      createdAt: new Date().toISOString(),
-      active: true,
-    },
-  ]);
+  const [advisories, setAdvisories] = useState([]);
   const [advisoryDialog, setAdvisoryDialog] = useState(false);
   const [currentAdvisory, setCurrentAdvisory] = useState(null);
 
@@ -123,6 +104,7 @@ const Authority = () => {
 
   useEffect(() => {
     fetchRequests();
+    fetchAdvisories();
   }, []);
 
   const fetchRequests = async () => {
@@ -175,6 +157,16 @@ const Authority = () => {
     setSelectedRequest(null);
   };
 
+  const fetchAdvisories = async () => {
+    try {
+      const response = await advisoryService.getAllAdvisories();
+      setAdvisories(response.advisories);
+    } catch (error) {
+      console.error("Error fetching advisories:", error);
+      toast.error("Failed to load advisories");
+    }
+  };
+
   // Advisory handlers
   const handleOpenAdvisoryDialog = (advisory = null) => {
     setCurrentAdvisory(
@@ -193,40 +185,55 @@ const Authority = () => {
     setCurrentAdvisory(null);
   };
 
-  const handleSaveAdvisory = () => {
-    if (currentAdvisory.id) {
-      // Update existing
-      setAdvisories(
-        advisories.map((a) =>
-          a.id === currentAdvisory.id ? currentAdvisory : a
-        )
-      );
-      toast.success("Advisory updated successfully");
-    } else {
-      // Create new
-      setAdvisories([
-        ...advisories,
-        {
-          ...currentAdvisory,
-          id: Date.now(),
-          createdAt: new Date().toISOString(),
-        },
-      ]);
-      toast.success("Advisory created successfully");
+  const handleSaveAdvisory = async () => {
+    try {
+      if (currentAdvisory._id) {
+        // Update existing
+        await advisoryService.updateAdvisory(currentAdvisory._id, {
+          title: currentAdvisory.title,
+          content: currentAdvisory.content,
+          severity: currentAdvisory.severity,
+          active: currentAdvisory.active,
+        });
+        toast.success("Advisory updated successfully");
+      } else {
+        // Create new
+        await advisoryService.createAdvisory({
+          title: currentAdvisory.title,
+          content: currentAdvisory.content,
+          severity: currentAdvisory.severity,
+          active: currentAdvisory.active,
+        });
+        toast.success("Advisory created successfully");
+      }
+      handleCloseAdvisoryDialog();
+      fetchAdvisories();
+    } catch (error) {
+      console.error("Error saving advisory:", error);
+      toast.error("Failed to save advisory");
     }
-    handleCloseAdvisoryDialog();
   };
 
-  const handleDeleteAdvisory = (id) => {
-    setAdvisories(advisories.filter((a) => a.id !== id));
-    toast.success("Advisory deleted successfully");
+  const handleDeleteAdvisory = async (id) => {
+    try {
+      await advisoryService.deleteAdvisory(id);
+      toast.success("Advisory deleted successfully");
+      fetchAdvisories();
+    } catch (error) {
+      console.error("Error deleting advisory:", error);
+      toast.error("Failed to delete advisory");
+    }
   };
 
-  const handleToggleAdvisory = (id) => {
-    setAdvisories(
-      advisories.map((a) => (a.id === id ? { ...a, active: !a.active } : a))
-    );
-    toast.success("Advisory status updated");
+  const handleToggleAdvisory = async (id) => {
+    try {
+      await advisoryService.toggleAdvisoryStatus(id);
+      toast.success("Advisory status updated");
+      fetchAdvisories();
+    } catch (error) {
+      console.error("Error toggling advisory:", error);
+      toast.error("Failed to update advisory status");
+    }
   };
 
   // Shelter handlers
@@ -640,7 +647,7 @@ const Authority = () => {
 
       <Grid container spacing={2}>
         {advisories.map((advisory) => (
-          <Grid item xs={12} key={advisory.id}>
+          <Grid item xs={12} key={advisory._id}>
             <Card variant={advisory.active ? "elevation" : "outlined"}>
               <CardContent>
                 <Box
@@ -685,7 +692,7 @@ const Authority = () => {
                   <Box>
                     <IconButton
                       size="small"
-                      onClick={() => handleToggleAdvisory(advisory.id)}>
+                      onClick={() => handleToggleAdvisory(advisory._id)}>
                       <ViewIcon />
                     </IconButton>
                     <IconButton
@@ -695,7 +702,7 @@ const Authority = () => {
                     </IconButton>
                     <IconButton
                       size="small"
-                      onClick={() => handleDeleteAdvisory(advisory.id)}>
+                      onClick={() => handleDeleteAdvisory(advisory._id)}>
                       <DeleteIcon />
                     </IconButton>
                   </Box>

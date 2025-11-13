@@ -9,53 +9,36 @@ import {
   Grid,
   Paper,
   Alert,
+  CircularProgress,
 } from "@mui/material";
 import {
   Warning as WarningIcon,
   Info as InfoIcon,
   Error as ErrorIcon,
 } from "@mui/icons-material";
+import { advisoryService } from "../services/api";
+import { toast } from "react-toastify";
 
 const PublicAdvisories = () => {
-  // For now using mock data - in production, this would fetch from backend API
-  const [advisories] = useState([
-    {
-      id: 1,
-      title: "Flood Alert - Northern Districts",
-      content:
-        "Heavy rainfall expected in the next 48 hours. Residents in low-lying areas are advised to move to higher ground. Emergency shelters are available at City Hall, Central School, and Community Center.",
-      severity: "High",
-      createdAt: new Date().toISOString(),
-      active: true,
-    },
-    {
-      id: 2,
-      title: "Emergency Shelter Locations",
-      content:
-        "Three emergency shelters have been opened: 1) City Hall (123 Main St) - Capacity 500, 2) Central School (456 School Rd) - Capacity 300, 3) Community Center (789 Community Ave) - Capacity 400. All shelters are equipped with food, water, blankets, and medical supplies.",
-      severity: "Medium",
-      createdAt: new Date(Date.now() - 86400000).toISOString(),
-      active: true,
-    },
-    {
-      id: 3,
-      title: "Water Supply Advisory",
-      content:
-        "Boil water before consumption. Water purification tablets are available at all emergency shelters and distribution centers. Expected duration: 3-5 days.",
-      severity: "High",
-      createdAt: new Date(Date.now() - 172800000).toISOString(),
-      active: true,
-    },
-    {
-      id: 4,
-      title: "Emergency Contact Numbers",
-      content:
-        "For immediate assistance: Emergency Hotline: 1-800-DISASTER. Medical Emergency: 911. Shelter Information: 1-800-SHELTER. NGO Coordination: 1-800-NGO-HELP.",
-      severity: "Low",
-      createdAt: new Date(Date.now() - 259200000).toISOString(),
-      active: true,
-    },
-  ]);
+  const [advisories, setAdvisories] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchAdvisories();
+  }, []);
+
+  const fetchAdvisories = async () => {
+    try {
+      setLoading(true);
+      const response = await advisoryService.getActiveAdvisories();
+      setAdvisories(response.advisories);
+    } catch (error) {
+      console.error("Error fetching advisories:", error);
+      toast.error("Failed to load advisories");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const activeAdvisories = advisories.filter((a) => a.active);
 
@@ -100,7 +83,11 @@ const PublicAdvisories = () => {
           management authorities
         </Typography>
 
-        {activeAdvisories.length === 0 ? (
+        {loading ? (
+          <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : activeAdvisories.length === 0 ? (
           <Alert severity="info" sx={{ mt: 3 }}>
             No active advisories at this time. Please check back regularly for
             updates.
@@ -108,7 +95,7 @@ const PublicAdvisories = () => {
         ) : (
           <Grid container spacing={3} sx={{ mt: 2 }}>
             {activeAdvisories.map((advisory) => (
-              <Grid item xs={12} key={advisory.id}>
+              <Grid item xs={12} key={advisory._id}>
                 <Card
                   variant="outlined"
                   sx={{
