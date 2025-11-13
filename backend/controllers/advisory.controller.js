@@ -60,10 +60,9 @@ const updateAdvisory = asyncHandler(async (req, res) => {
   if (active !== undefined) advisory.active = active;
 
   const updatedAdvisory = await advisory.save();
-  const populatedAdvisory = await Advisory.findById(updatedAdvisory._id).populate(
-    "authorityId",
-    "name"
-  );
+  const populatedAdvisory = await Advisory.findById(
+    updatedAdvisory._id
+  ).populate("authorityId", "name");
 
   res.json({ advisory: populatedAdvisory });
 });
@@ -92,10 +91,9 @@ const toggleAdvisoryStatus = asyncHandler(async (req, res) => {
 
   advisory.active = !advisory.active;
   const updatedAdvisory = await advisory.save();
-  const populatedAdvisory = await Advisory.findById(updatedAdvisory._id).populate(
-    "authorityId",
-    "name"
-  );
+  const populatedAdvisory = await Advisory.findById(
+    updatedAdvisory._id
+  ).populate("authorityId", "name");
 
   res.json({ advisory: populatedAdvisory });
 });
