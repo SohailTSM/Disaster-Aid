@@ -45,11 +45,13 @@ export default function Login() {
       setLoading(true);
       const user = await login(data.email, data.password);
 
-      // Redirect based on user role
+      // Redirect based on user role to their dashboard
       if (user?.role === "dispatcher") {
         navigate("/dispatcher");
       } else if (user?.role === "ngo_member") {
         navigate("/ngo");
+      } else if (user?.role === "authority") {
+        navigate("/authority");
       } else if (user?.role === "admin") {
         navigate("/admin");
       } else {

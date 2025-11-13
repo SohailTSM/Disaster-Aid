@@ -50,15 +50,7 @@ export default function Navbar() {
             variant="h6"
             noWrap
             component={RouterLink}
-            to={
-              isAuthenticated()
-                ? user?.role === "dispatcher"
-                  ? "/dispatcher"
-                  : user?.role === "admin"
-                  ? "/admin"
-                  : "/ngo"
-                : "/"
-            }
+            to="/"
             sx={{
               mr: 2,
               fontWeight: 700,
@@ -72,13 +64,34 @@ export default function Navbar() {
           </Typography>
 
           <Box sx={{ flexGrow: 1, display: "flex", ml: 3 }}>
+            <Button
+              component={RouterLink}
+              to="/"
+              sx={{ my: 2, color: "white", display: "block" }}>
+              Home
+            </Button>
+
             {!isAuthenticated() && (
-              <Button
-                component={RouterLink}
-                to="/"
-                sx={{ my: 2, color: "white", display: "block" }}>
-                Request Help
-              </Button>
+              <>
+                <Button
+                  component={RouterLink}
+                  to="/request"
+                  sx={{ my: 2, color: "white", display: "block" }}>
+                  Request Help
+                </Button>
+                <Button
+                  component={RouterLink}
+                  to="/track-status"
+                  sx={{ my: 2, color: "white", display: "block" }}>
+                  Track Status
+                </Button>
+                <Button
+                  component={RouterLink}
+                  to="/advisories"
+                  sx={{ my: 2, color: "white", display: "block" }}>
+                  Advisories
+                </Button>
+              </>
             )}
 
             {isAuthenticated() && user?.role === "dispatcher" && (
@@ -86,7 +99,7 @@ export default function Navbar() {
                 component={RouterLink}
                 to="/dispatcher"
                 sx={{ my: 2, color: "white", display: "block" }}>
-                Dispatcher Dashboard
+                Dashboard
               </Button>
             )}
 
@@ -95,7 +108,7 @@ export default function Navbar() {
                 component={RouterLink}
                 to="/ngo"
                 sx={{ my: 2, color: "white", display: "block" }}>
-                NGO Dashboard
+                Dashboard
               </Button>
             )}
 
@@ -104,7 +117,16 @@ export default function Navbar() {
                 component={RouterLink}
                 to="/admin"
                 sx={{ my: 2, color: "white", display: "block" }}>
-                Admin Dashboard
+                Dashboard
+              </Button>
+            )}
+
+            {isAuthenticated() && user?.role === "authority" && (
+              <Button
+                component={RouterLink}
+                to="/authority"
+                sx={{ my: 2, color: "white", display: "block" }}>
+                Dashboard
               </Button>
             )}
           </Box>

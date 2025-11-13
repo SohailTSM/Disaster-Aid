@@ -25,7 +25,10 @@ const listRequests = asyncHandler(async (req, res) => {
 
 // GET /api/requests/:id (protected)
 const getRequest = asyncHandler(async (req, res) => {
-  const reqDoc = await Request.findById(req.params.id);
+  const reqDoc = await Request.findById(req.params.id).populate(
+    "needs.assignedTo",
+    "name contact email"
+  );
   if (!reqDoc) {
     res.status(404);
     throw new Error("Request not found");

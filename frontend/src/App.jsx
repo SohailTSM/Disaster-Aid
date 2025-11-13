@@ -12,12 +12,16 @@ import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 // Pages
+import Home from "./pages/Home";
 import RequestForm from "./pages/RequestForm";
 import Dispatcher from "./pages/Dispatcher";
 import NGO from "./pages/NGO";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import RequestDetails from "./pages/RequestDetails";
+import TrackStatus from "./pages/TrackStatus";
+import PublicAdvisories from "./pages/PublicAdvisories";
+import Authority from "./pages/Authority";
 import Admin from "./pages/Admin";
 
 // Components
@@ -70,8 +74,10 @@ function AppContent() {
       <Navbar />
       <Routes>
         {/* Public Routes - Accessible to everyone */}
-        <Route path="/" element={<RequestForm />} />
-        <Route path="/request-help" element={<RequestForm />} />
+        <Route path="/" element={<Home />} />
+        <Route path="/request" element={<RequestForm />} />
+        <Route path="/track-status" element={<TrackStatus />} />
+        <Route path="/advisories" element={<PublicAdvisories />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
@@ -105,6 +111,14 @@ function AppContent() {
           element={
             <ProtectedRoute roles={["admin"]}>
               <Admin />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/authority"
+          element={
+            <ProtectedRoute roles={["authority"]}>
+              <Authority />
             </ProtectedRoute>
           }
         />
