@@ -32,28 +32,24 @@ import {
   TableRow,
   Typography,
   TextField,
-  // Avatar, // Not used
   CircularProgress,
   Divider,
   Chip,
-  // IconButton, // Not used
-  Alert, // Added Alert for error handling
+  IconButton,
+  Alert,
 } from "@mui/material";
 import {
   People as PeopleIcon,
   LocalShipping as LocalShippingIcon,
   Assignment as AssignmentIcon,
   AccessTime as AccessTimeIcon,
-  // ArrowUpward as ArrowUpwardIcon, // Not used
-  // ArrowDownward as ArrowDownwardIcon, // Not used
-  // MoreVert as MoreVertIcon, // Not used
-  // CheckCircle as CheckCircleIcon, // Not used
-  // Pending as PendingIcon, // Not used
-  // Error as ErrorIcon, // Not used
   Add as AddIcon,
-  // Search as SearchIcon, // Not used
-  // FilterList as FilterListIcon, // Not used
   Refresh as RefreshIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  CheckCircle as CheckCircleIcon,
+  Warning as WarningIcon,
+  Business as BusinessIcon,
 } from "@mui/icons-material";
 
 // Status mapping for requests (must match backend model)
@@ -127,6 +123,20 @@ export default function Dispatcher() {
     type: "",
     quantity: 1,
   });
+
+  // Edit/Delete need states
+  const [editingNeed, setEditingNeed] = useState(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editNeedType, setEditNeedType] = useState("");
+  const [editNeedQuantity, setEditNeedQuantity] = useState(0);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [needToDelete, setNeedToDelete] = useState(null);
+
+  // NGO assignment for individual needs
+  const [assignNeedDialogOpen, setAssignNeedDialogOpen] = useState(false);
+  const [selectedNeedForAssignment, setSelectedNeedForAssignment] =
+    useState(null);
+  const [selectedNgoForNeed, setSelectedNgoForNeed] = useState("");
 
   // Stats data is initialized but not rendered in the provided JSX.
   // Kept for completeness.
@@ -365,6 +375,127 @@ export default function Dispatcher() {
     }
   };
 
+  // Handle editing a need
+  const handleEditNeed = (need, index) => {
+    setEditingNeed({ ...need, index });
+    setEditNeedType(need.type);
+    setEditNeedQuantity(need.quantity);
+    setEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    try {
+      setLoading(true);
+      await requestService.updateNeed(selectedRequest._id, editingNeed.index, {
+        type: editNeedType,
+        quantity: editNeedQuantity,
+      });
+
+      // Refresh request data
+      const response = await requestService.getRequestById(selectedRequest._id);
+      const updatedRequest = response.request;
+
+      const updatedRequests = allRequests.map((req) =>
+        req._id === updatedRequest._id ? updatedRequest : req
+      );
+
+      setAllRequests(updatedRequests);
+      setSelectedRequest(updatedRequest);
+
+      toast.success("Need updated successfully");
+      setEditDialogOpen(false);
+      setEditingNeed(null);
+    } catch (err) {
+      console.error("Error updating need:", err);
+      toast.error(err.response?.data?.message || "Failed to update need");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle deleting a need
+  const handleDeleteNeed = (need, index) => {
+    setNeedToDelete({ ...need, index });
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteNeed = async () => {
+    try {
+      setLoading(true);
+      await requestService.deleteNeed(selectedRequest._id, needToDelete.index);
+
+      // Refresh request data
+      const response = await requestService.getRequestById(selectedRequest._id);
+      const updatedRequest = response.request;
+
+      const updatedRequests = allRequests.map((req) =>
+        req._id === updatedRequest._id ? updatedRequest : req
+      );
+
+      setAllRequests(updatedRequests);
+      setSelectedRequest(updatedRequest);
+
+      toast.success("Need deleted successfully");
+      setDeleteDialogOpen(false);
+      setNeedToDelete(null);
+    } catch (err) {
+      console.error("Error deleting need:", err);
+      toast.error(err.response?.data?.message || "Failed to delete need");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle assigning an NGO to a specific need
+  const handleAssignNeedToNGO = (need, index) => {
+    setSelectedNeedForAssignment({ ...need, index });
+    setSelectedNgoForNeed("");
+    setAssignNeedDialogOpen(true);
+  };
+
+  const confirmAssignNeedToNGO = async () => {
+    if (!selectedNgoForNeed) {
+      toast.error("Please select an NGO");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Create assignment for this specific need
+      await assignmentService.createAssignment({
+        requestId: selectedRequest._id,
+        organizationId: selectedNgoForNeed,
+        assignedNeeds: [selectedNeedForAssignment.type],
+        notes: `Assigned ${selectedNeedForAssignment.type} (${selectedNeedForAssignment.quantity} units)`,
+      });
+
+      // Refresh request data to show updated assignment status
+      const response = await requestService.getRequestById(selectedRequest._id);
+      const updatedRequest = response.request;
+
+      const updatedRequests = allRequests.map((req) =>
+        req._id === updatedRequest._id ? updatedRequest : req
+      );
+
+      setAllRequests(updatedRequests);
+      setSelectedRequest(updatedRequest);
+
+      const ngoName =
+        ngos.find((ngo) => ngo._id === selectedNgoForNeed)?.name || "NGO";
+      toast.success(`Assigned ${selectedNeedForAssignment.type} to ${ngoName}`);
+
+      setAssignNeedDialogOpen(false);
+      setSelectedNeedForAssignment(null);
+      setSelectedNgoForNeed("");
+    } catch (err) {
+      console.error("Error assigning need:", err);
+      toast.error(err.response?.data?.message || "Failed to assign need");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Centralized filter logic
   const filterRequests = (status) => {
     setStatusFilter(status);
@@ -539,21 +670,6 @@ export default function Dispatcher() {
                           size="small"
                           onClick={() => handleViewRequest(request)}>
                           View
-                        </Button>
-                        <Button
-                          variant="contained"
-                          size="small"
-                          onClick={() =>
-                            navigate(`/request/${request._id}`, {
-                              state: { request },
-                            })
-                          }
-                          disabled={request.status === REQUEST_STATUS.CLOSED}>
-                          {request.status === REQUEST_STATUS.NEW
-                            ? "Assign"
-                            : request.status === REQUEST_STATUS.CLOSED
-                            ? "Declined"
-                            : "View Details"}
                         </Button>
                       </Box>
                     </TableCell>
@@ -783,27 +899,138 @@ export default function Dispatcher() {
 
                       {selectedRequest.needs?.length > 0 ? (
                         <Box>
-                          {selectedRequest.needs.map((need, index) => (
-                            <Box
-                              key={index}
-                              mb={2}
-                              p={1.5}
-                              bgcolor="grey.50"
-                              borderRadius={1}
-                              border="1px solid"
-                              borderColor="divider">
+                          {selectedRequest.needs.map((need, index) => {
+                            const isAssigned =
+                              need.assignmentStatus === "assigned";
+                            const isDeclined =
+                              need.assignmentStatus === "declined";
+                            const canEdit = !isAssigned;
+
+                            return (
                               <Box
-                                display="flex"
-                                justifyContent="space-between"
-                                alignItems="flex-start">
-                                <Box>
-                                  <Typography variant="subtitle2">
-                                    {need.type} - {need.quantity} units
-                                  </Typography>
+                                key={index}
+                                mb={2}
+                                p={1.5}
+                                bgcolor="grey.50"
+                                borderRadius={1}
+                                border="1px solid"
+                                borderColor="divider">
+                                <Box
+                                  display="flex"
+                                  justifyContent="space-between"
+                                  alignItems="flex-start">
+                                  <Box flex={1}>
+                                    <Box
+                                      display="flex"
+                                      alignItems="center"
+                                      gap={1}
+                                      mb={0.5}>
+                                      <Typography variant="subtitle2">
+                                        {need.type} - {need.quantity} units
+                                      </Typography>
+                                      {isAssigned && (
+                                        <CheckCircleIcon
+                                          color="success"
+                                          fontSize="small"
+                                        />
+                                      )}
+                                      {isDeclined && (
+                                        <WarningIcon
+                                          color="warning"
+                                          fontSize="small"
+                                        />
+                                      )}
+                                    </Box>
+
+                                    {/* Status Chip */}
+                                    <Box display="flex" gap={1} mb={1}>
+                                      {isAssigned && (
+                                        <Chip
+                                          label="Assigned"
+                                          color="success"
+                                          size="small"
+                                        />
+                                      )}
+                                      {isDeclined && (
+                                        <Chip
+                                          label="Declined - Reassign"
+                                          color="warning"
+                                          size="small"
+                                        />
+                                      )}
+                                      {!isAssigned && !isDeclined && (
+                                        <Chip
+                                          label="Available"
+                                          color="default"
+                                          size="small"
+                                          variant="outlined"
+                                        />
+                                      )}
+                                    </Box>
+
+                                    {/* Show assigned NGO */}
+                                    {isAssigned && need.assignedTo && (
+                                      <Box
+                                        display="flex"
+                                        alignItems="center"
+                                        gap={0.5}>
+                                        <BusinessIcon
+                                          fontSize="small"
+                                          color="primary"
+                                        />
+                                        <Typography
+                                          variant="caption"
+                                          color="text.secondary">
+                                          {ngos.find(
+                                            (n) => n._id === need.assignedTo
+                                          )?.name || "NGO"}
+                                        </Typography>
+                                      </Box>
+                                    )}
+                                  </Box>
+
+                                  {/* Action Buttons */}
+                                  <Box display="flex" gap={0.5}>
+                                    {!isAssigned && (
+                                      <Button
+                                        size="small"
+                                        variant="outlined"
+                                        onClick={() =>
+                                          handleAssignNeedToNGO(need, index)
+                                        }>
+                                        Assign
+                                      </Button>
+                                    )}
+                                    {canEdit && (
+                                      <>
+                                        <IconButton
+                                          size="small"
+                                          color="primary"
+                                          onClick={() =>
+                                            handleEditNeed(need, index)
+                                          }
+                                          title="Edit need">
+                                          <EditIcon fontSize="small" />
+                                        </IconButton>
+                                        <IconButton
+                                          size="small"
+                                          color="error"
+                                          onClick={() =>
+                                            handleDeleteNeed(need, index)
+                                          }
+                                          title="Delete need"
+                                          disabled={
+                                            selectedRequest.needs.length === 1
+                                          }>
+                                          <DeleteIcon fontSize="small" />
+                                        </IconButton>
+                                      </>
+                                    )}
+                                  </Box>
                                 </Box>
                               </Box>
-                            </Box>
-                          ))}
+                            );
+                          })}
                         </Box>
                       ) : (
                         <Box textAlign="center" py={2}>
@@ -990,6 +1217,155 @@ export default function Dispatcher() {
             variant="contained"
             disabled={!newNeed.type || newNeed.quantity < 1 || loading}>
             {loading ? <CircularProgress size={24} /> : "Add Need"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit Need Dialog */}
+      <Dialog
+        open={editDialogOpen}
+        onClose={() => setEditDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth>
+        <DialogTitle>Edit Need</DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 2 }}>
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel>Need Type</InputLabel>
+              <Select
+                value={editNeedType}
+                label="Need Type"
+                onChange={(e) => setEditNeedType(e.target.value)}>
+                <MenuItem value="rescue">Rescue</MenuItem>
+                <MenuItem value="food">Food</MenuItem>
+                <MenuItem value="water">Water</MenuItem>
+                <MenuItem value="medical">Medical Assistance</MenuItem>
+                <MenuItem value="shelter">Shelter</MenuItem>
+                <MenuItem value="baby_supplies">Baby Supplies</MenuItem>
+                <MenuItem value="sanitation">Sanitation</MenuItem>
+                <MenuItem value="transport">Transport</MenuItem>
+                <MenuItem value="power_charging">Power/Charging</MenuItem>
+              </Select>
+            </FormControl>
+            <TextField
+              fullWidth
+              type="number"
+              label="Quantity"
+              value={editNeedQuantity}
+              onChange={(e) => setEditNeedQuantity(parseInt(e.target.value))}
+              inputProps={{ min: 1 }}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+          <Button
+            onClick={handleSaveEdit}
+            variant="contained"
+            color="primary"
+            disabled={!editNeedType || editNeedQuantity < 1}>
+            Save Changes
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Need Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        maxWidth="sm">
+        <DialogTitle>Confirm Delete</DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Are you sure you want to delete this need?
+          </Alert>
+          {needToDelete && (
+            <Typography variant="body1">
+              <strong>Need Type:</strong> {needToDelete.type}
+              <br />
+              <strong>Quantity:</strong> {needToDelete.quantity}
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+          <Button onClick={confirmDeleteNeed} variant="contained" color="error">
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Assign Need to NGO Dialog */}
+      <Dialog
+        open={assignNeedDialogOpen}
+        onClose={() => setAssignNeedDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth>
+        <DialogTitle>Assign Need to NGO</DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="body2" color="text.secondary" paragraph>
+              Assign <strong>{selectedNeedForAssignment?.type}</strong> (
+              {selectedNeedForAssignment?.quantity} units) to an NGO
+            </Typography>
+
+            <FormControl fullWidth sx={{ mt: 2 }}>
+              <InputLabel id="ngo-assign-label">Select NGO</InputLabel>
+              <Select
+                labelId="ngo-assign-label"
+                value={selectedNgoForNeed}
+                label="Select NGO"
+                onChange={(e) => setSelectedNgoForNeed(e.target.value)}>
+                {ngos
+                  .filter(
+                    (ngo) =>
+                      (ngo.approved || ngo.verificationStatus === "verified") &&
+                      !ngo.suspended &&
+                      ngo.offers?.some(
+                        (offer) =>
+                          offer.type === selectedNeedForAssignment?.type
+                      )
+                  )
+                  .map((ngo) => (
+                    <MenuItem key={ngo._id} value={ngo._id}>
+                      <Box>
+                        <Typography variant="body2">{ngo.name}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {ngo.offers
+                            ?.filter(
+                              (offer) =>
+                                offer.type === selectedNeedForAssignment?.type
+                            )
+                            .map((offer) => `${offer.quantity} available`)
+                            .join(", ")}
+                        </Typography>
+                      </Box>
+                    </MenuItem>
+                  ))}
+              </Select>
+            </FormControl>
+
+            {ngos.filter(
+              (ngo) =>
+                (ngo.approved || ngo.verificationStatus === "verified") &&
+                !ngo.suspended &&
+                ngo.offers?.some(
+                  (offer) => offer.type === selectedNeedForAssignment?.type
+                )
+            ).length === 0 && (
+              <Alert severity="info" sx={{ mt: 2 }}>
+                No NGOs available for {selectedNeedForAssignment?.type}
+              </Alert>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAssignNeedDialogOpen(false)}>Cancel</Button>
+          <Button
+            onClick={confirmAssignNeedToNGO}
+            variant="contained"
+            disabled={!selectedNgoForNeed || loading}>
+            {loading ? <CircularProgress size={24} /> : "Assign"}
           </Button>
         </DialogActions>
       </Dialog>

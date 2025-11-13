@@ -57,6 +57,19 @@ export const requestService = {
     const response = await api.put(`/requests/${id}/status`, { status });
     return response.data;
   },
+  updateNeed: async (requestId, needIndex, needData) => {
+    const response = await api.put(
+      `/requests/${requestId}/needs/${needIndex}`,
+      needData
+    );
+    return response.data;
+  },
+  deleteNeed: async (requestId, needIndex) => {
+    const response = await api.delete(
+      `/requests/${requestId}/needs/${needIndex}`
+    );
+    return response.data;
+  },
 };
 
 export const organizationService = {
@@ -111,19 +124,55 @@ export const assignmentService = {
     const response = await api.get("/assignments/my");
     return response.data;
   },
-  getAssignmentsByRequest: async (requestId) => {
-    const response = await api.get(`/assignments/request/${requestId}`);
+  acceptAssignment: async (
+    id,
+    isPartialAcceptance = false,
+    acceptedNeeds = []
+  ) => {
+    const response = await api.put(`/assignments/${id}/accept`, {
+      isPartialAcceptance,
+      acceptedNeeds,
+    });
     return response.data;
   },
-  updateAssignmentStatus: async (id, status, notes = "") => {
+  declineAssignment: async (id, declineReason) => {
+    const response = await api.put(`/assignments/${id}/decline`, {
+      declineReason,
+    });
+    return response.data;
+  },
+  updateAssignmentStatus: async (
+    id,
+    status,
+    deliveryDetails = null,
+    completionProof = null,
+    notes = ""
+  ) => {
     const response = await api.put(`/assignments/${id}/status`, {
       status,
+      deliveryDetails,
+      completionProof,
       notes,
     });
     return response.data;
   },
+  getAssignmentsByRequest: async (requestId) => {
+    const response = await api.get(`/assignments/request/${requestId}`);
+    return response.data;
+  },
   getAssignment: async (id) => {
     const response = await api.get(`/assignments/${id}`);
+    return response.data;
+  },
+};
+
+export const ngoService = {
+  getMyOrganization: async () => {
+    const response = await api.get("/organizations/my");
+    return response.data;
+  },
+  updateMyResources: async (offers) => {
+    const response = await api.put("/organizations/my/resources", { offers });
     return response.data;
   },
 };

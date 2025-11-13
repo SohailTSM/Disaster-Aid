@@ -63,10 +63,82 @@ const getRequestByRequestId = asyncHandler(async (req, res) => {
   res.json({ request: reqDoc, components });
 });
 
+// PUT /api/requests/:requestId/needs/:needIndex - Update a specific need
+const updateNeed = asyncHandler(async (req, res) => {
+  const { requestId, needIndex } = req.params;
+  const { type, quantity } = req.body;
+
+  const reqDoc = await Request.findById(requestId);
+  if (!reqDoc) {
+    res.status(404);
+    throw new Error("Request not found");
+  }
+
+  const index = parseInt(needIndex);
+  if (isNaN(index) || index < 0 || index >= reqDoc.needs.length) {
+    res.status(400);
+    throw new Error("Invalid need index");
+  }
+
+  // Check if the need is already assigned
+  if (reqDoc.needs[index].assignmentStatus === "assigned") {
+    res.status(400);
+    throw new Error(
+      "Cannot edit this need as it has already been assigned to an NGO"
+    );
+  }
+
+  // Update the need
+  if (type) reqDoc.needs[index].type = type;
+  if (quantity) reqDoc.needs[index].quantity = quantity;
+
+  await reqDoc.save();
+  res.json({ message: "Need updated successfully", request: reqDoc });
+});
+
+// DELETE /api/requests/:requestId/needs/:needIndex - Delete a specific need
+const deleteNeed = asyncHandler(async (req, res) => {
+  const { requestId, needIndex } = req.params;
+
+  const reqDoc = await Request.findById(requestId);
+  if (!reqDoc) {
+    res.status(404);
+    throw new Error("Request not found");
+  }
+
+  const index = parseInt(needIndex);
+  if (isNaN(index) || index < 0 || index >= reqDoc.needs.length) {
+    res.status(400);
+    throw new Error("Invalid need index");
+  }
+
+  // Check if the need is already assigned
+  if (reqDoc.needs[index].assignmentStatus === "assigned") {
+    res.status(400);
+    throw new Error(
+      "Cannot delete this need as it has already been assigned to an NGO"
+    );
+  }
+
+  // Ensure at least one need remains
+  if (reqDoc.needs.length === 1) {
+    res.status(400);
+    throw new Error("Cannot delete the last remaining need from the request");
+  }
+
+  // Remove the need
+  reqDoc.needs.splice(index, 1);
+  await reqDoc.save();
+
+  res.json({ message: "Need deleted successfully", request: reqDoc });
+});
+
 module.exports = {
   createRequest,
   listRequests,
   getRequest,
   updateRequest,
   getRequestByRequestId,
+  updateNeed,
+  deleteNeed,
 };

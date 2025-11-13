@@ -177,6 +177,48 @@ const unsuspendOrganization = asyncHandler(async (req, res) => {
   res.json({ message: "Organization unsuspended", organization: org });
 });
 
+// PUT /api/organizations/my/resources (ngo_member) - Update own organization's resources
+const updateMyResources = asyncHandler(async (req, res) => {
+  if (!req.user.organizationId) {
+    res.status(400);
+    throw new Error("User has no organization");
+  }
+
+  const { offers } = req.body;
+
+  if (!offers || !Array.isArray(offers)) {
+    res.status(400);
+    throw new Error("Offers array is required");
+  }
+
+  const org = await Organization.findById(req.user.organizationId);
+  if (!org) {
+    res.status(404);
+    throw new Error("Organization not found");
+  }
+
+  org.offers = offers;
+  await org.save();
+
+  res.json({ message: "Resources updated successfully", organization: org });
+});
+
+// GET /api/organizations/my (ngo_member) - Get own organization details
+const getMyOrganization = asyncHandler(async (req, res) => {
+  if (!req.user.organizationId) {
+    res.status(400);
+    throw new Error("User has no organization");
+  }
+
+  const org = await Organization.findById(req.user.organizationId);
+  if (!org) {
+    res.status(404);
+    throw new Error("Organization not found");
+  }
+
+  res.json({ organization: org });
+});
+
 module.exports = {
   createOrganization,
   listOrganizations,
@@ -188,4 +230,6 @@ module.exports = {
   exportIncidents,
   suspendOrganization,
   unsuspendOrganization,
+  updateMyResources,
+  getMyOrganization,
 };

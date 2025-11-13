@@ -33,6 +33,7 @@ import {
   CloudUpload,
 } from "@mui/icons-material";
 import { requestService } from "../services/api";
+import { useAuth } from "../contexts/AuthContext";
 
 const NEEDS_OPTIONS = [
   { value: "rescue", label: "Rescue" },
@@ -85,6 +86,7 @@ const requestSchema = yup.object().shape({
 });
 
 export default function RequestForm() {
+  const { user, isAuthenticated } = useAuth();
   const [submitted, setSubmitted] = useState(false);
   const [submittedRequestId, setSubmittedRequestId] = useState(null);
   const [error, setError] = useState("");
@@ -478,6 +480,29 @@ export default function RequestForm() {
             }}>
             Submit Another Request
           </Button>
+        </Paper>
+      </Container>
+    );
+  }
+
+  // If user is logged in, show a message that they cannot submit requests
+  if (isAuthenticated()) {
+    return (
+      <Container maxWidth="md" sx={{ mt: 4 }}>
+        <Paper elevation={3} sx={{ p: 4 }}>
+          <Alert severity="info" sx={{ mb: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              Request Form Not Available
+            </Typography>
+            <Typography variant="body1">
+              You are currently logged in as <strong>{user?.name}</strong> (
+              {user?.role}).
+            </Typography>
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              The request form is only available to public users who need
+              assistance. If you need to submit a request, please log out first.
+            </Typography>
+          </Alert>
         </Paper>
       </Container>
     );

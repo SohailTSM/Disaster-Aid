@@ -11,9 +11,20 @@ const {
   exportIncidents,
   suspendOrganization,
   unsuspendOrganization,
+  updateMyResources,
+  getMyOrganization,
 } = require("../controllers/organization.controller");
 const auth = require("../middleware/auth.middleware");
 const allowedRoles = require("../middleware/roles.middleware");
+
+// NGO member routes (must come before /:id routes)
+router.get("/my", auth, allowedRoles("ngo_member"), getMyOrganization);
+router.put(
+  "/my/resources",
+  auth,
+  allowedRoles("ngo_member"),
+  updateMyResources
+);
 
 // Admin routes for org approval and data management
 router.get("/pending", auth, allowedRoles("admin"), listPendingOrganizations);

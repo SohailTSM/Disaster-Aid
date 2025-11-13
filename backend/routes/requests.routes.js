@@ -6,6 +6,8 @@ const {
   getRequest,
   updateRequest,
   getRequestByRequestId,
+  updateNeed,
+  deleteNeed,
 } = require("../controllers/request.controller");
 const auth = require("../middleware/auth.middleware");
 const allowedRoles = require("../middleware/roles.middleware");
@@ -31,6 +33,20 @@ router.put(
   auth,
   allowedRoles("dispatcher", "authority", "admin"),
   updateRequest
+);
+
+// Need-level operations
+router.put(
+  "/:requestId/needs/:needIndex",
+  auth,
+  allowedRoles("dispatcher", "admin"),
+  updateNeed
+);
+router.delete(
+  "/:requestId/needs/:needIndex",
+  auth,
+  allowedRoles("dispatcher", "admin"),
+  deleteNeed
 );
 
 module.exports = router;

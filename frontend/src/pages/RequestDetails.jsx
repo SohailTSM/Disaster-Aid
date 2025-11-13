@@ -33,12 +33,17 @@ import {
   Select,
   MenuItem,
   Alert,
+  TextField,
+  IconButton,
 } from "@mui/material";
 import {
   ArrowBack as ArrowBackIcon,
   CheckCircle as CheckCircleIcon,
   Business as BusinessIcon,
   LocalShipping as LocalShippingIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Warning as WarningIcon,
 } from "@mui/icons-material";
 
 const RequestDetails = () => {
@@ -53,6 +58,14 @@ const RequestDetails = () => {
   const [selectedNgo, setSelectedNgo] = useState("");
   const [openNgoDialog, setOpenNgoDialog] = useState(false);
   const [assignedNGOs, setAssignedNGOs] = useState({});
+
+  // Edit/Delete need states
+  const [editingNeed, setEditingNeed] = useState(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editNeedType, setEditNeedType] = useState("");
+  const [editNeedQuantity, setEditNeedQuantity] = useState(0);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [needToDelete, setNeedToDelete] = useState(null);
 
   // Load request data when component mounts
   useEffect(() => {
@@ -115,37 +128,107 @@ const RequestDetails = () => {
     setOpenNgoDialog(true);
   };
 
+  const handleEditNeed = (need, index) => {
+    setEditingNeed({ ...need, index });
+    setEditNeedType(need.type);
+    setEditNeedQuantity(need.quantity);
+    setEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    try {
+      setLoading(true);
+      await requestService.updateNeed(request._id, editingNeed.index, {
+        type: editNeedType,
+        quantity: editNeedQuantity,
+      });
+
+      // Refresh request data
+      const response = await requestService.getRequestById(id);
+      setRequest(response.request);
+      toast.success("Need updated successfully");
+      setEditDialogOpen(false);
+      setEditingNeed(null);
+    } catch (err) {
+      console.error("Error updating need:", err);
+      toast.error(err.response?.data?.message || "Failed to update need");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteNeed = (need, index) => {
+    setNeedToDelete({ ...need, index });
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteNeed = async () => {
+    try {
+      setLoading(true);
+      await requestService.deleteNeed(request._id, needToDelete.index);
+
+      // Refresh request data
+      const response = await requestService.getRequestById(id);
+      setRequest(response.request);
+
+      // Remove from assignedNGOs if it was selected
+      const newAssignedNGOs = { ...assignedNGOs };
+      delete newAssignedNGOs[needToDelete.type];
+      setAssignedNGOs(newAssignedNGOs);
+
+      toast.success("Need deleted successfully");
+      setDeleteDialogOpen(false);
+      setNeedToDelete(null);
+    } catch (err) {
+      console.error("Error deleting need:", err);
+      toast.error(err.response?.data?.message || "Failed to delete need");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAssignAll = async () => {
     try {
       setLoading(true);
 
+      // Get only the unassigned/declined needs that have an NGO selected
+      const needsToAssign = request.needs.filter(
+        (need) =>
+          (need.assignmentStatus === "unassigned" ||
+            need.assignmentStatus === "declined") &&
+          assignedNGOs[need.type]
+      );
+
+      if (needsToAssign.length === 0) {
+        toast.info("No needs selected for assignment");
+        setLoading(false);
+        return;
+      }
+
       // Group needs by NGO
       const ngoAssignments = {};
-      Object.entries(assignedNGOs).forEach(([needType, ngoId]) => {
+      needsToAssign.forEach((need) => {
+        const ngoId = assignedNGOs[need.type];
         if (!ngoAssignments[ngoId]) {
           ngoAssignments[ngoId] = [];
         }
-        const need = request.needs.find((n) => n.type === needType);
-        if (need) {
-          ngoAssignments[ngoId].push(need);
-        }
+        ngoAssignments[ngoId].push(need.type);
       });
 
       console.log("Creating assignments for NGOs:", ngoAssignments);
 
-      // Create one assignment per NGO with all their needs
+      // Create one assignment per NGO with their specific needs
       const assignmentPromises = Object.entries(ngoAssignments).map(
-        ([ngoId, needs]) => {
+        ([ngoId, needTypes]) => {
           const ngoName = ngos.find((ngo) => ngo._id === ngoId)?.name || "NGO";
-          const needsText = needs
-            .map((n) => `${n.type} (${n.quantity})`)
-            .join(", ");
+          const needsText = needTypes.join(", ");
 
           console.log(`Creating assignment for ${ngoName}:`, needsText);
 
           return assignmentService.createAssignment({
             requestId: request._id,
             organizationId: ngoId,
+            assignedNeeds: needTypes,
             notes: `Assigned needs: ${needsText}`,
           });
         }
@@ -154,7 +237,7 @@ const RequestDetails = () => {
       await Promise.all(assignmentPromises);
 
       toast.success(
-        `Successfully assigned all needs to ${
+        `Successfully assigned ${needsToAssign.length} need(s) to ${
           Object.keys(ngoAssignments).length
         } NGO(s)`
       );
@@ -201,6 +284,18 @@ const RequestDetails = () => {
       setAssignedNGOs(initialAssignments);
     }
   }, [request]);
+
+  // Check if all unassigned and not-declined needs have been selected for assignment
+  const unassignedNeeds =
+    request?.needs?.filter(
+      (need) =>
+        need.assignmentStatus === "unassigned" ||
+        need.assignmentStatus === "declined"
+    ) || [];
+
+  const allNeedsAssigned = unassignedNeeds.every(
+    (need) => assignedNGOs[need.type]
+  );
 
   if (loading) {
     return (
@@ -249,10 +344,6 @@ const RequestDetails = () => {
       </Container>
     );
   }
-
-  const allNeedsAssigned = request.needs.every(
-    (need) => assignedNGOs[need.type]
-  );
 
   return (
     <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
@@ -323,50 +414,114 @@ const RequestDetails = () => {
                 <TableRow>
                   <TableCell>Need Type</TableCell>
                   <TableCell align="right">Quantity</TableCell>
+                  <TableCell>Status</TableCell>
                   <TableCell>Assigned To</TableCell>
                   <TableCell>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {request.needs.map((need, index) => (
-                  <TableRow key={index}>
-                    <TableCell>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                        {need.type}
-                        {assignedNGOs[need.type] && (
-                          <CheckCircleIcon color="success" fontSize="small" />
+                {request.needs.map((need, index) => {
+                  const isAssigned = need.assignmentStatus === "assigned";
+                  const isDeclined = need.assignmentStatus === "declined";
+                  const canEdit = !isAssigned;
+
+                  return (
+                    <TableRow key={index}>
+                      <TableCell>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1,
+                          }}>
+                          {need.type}
+                          {isAssigned && (
+                            <CheckCircleIcon color="success" fontSize="small" />
+                          )}
+                          {isDeclined && (
+                            <WarningIcon color="warning" fontSize="small" />
+                          )}
+                        </Box>
+                      </TableCell>
+                      <TableCell align="right">{need.quantity}</TableCell>
+                      <TableCell>
+                        {isAssigned && (
+                          <Chip label="Assigned" color="success" size="small" />
                         )}
-                      </Box>
-                    </TableCell>
-                    <TableCell align="right">{need.quantity}</TableCell>
-                    <TableCell>
-                      {assignedNGOs[need.type] ? (
-                        <Chip
-                          icon={<BusinessIcon />}
-                          label={getNgoName(assignedNGOs[need.type])}
-                          color="primary"
-                          size="small"
-                        />
-                      ) : (
-                        <Chip
-                          label="Not assigned"
-                          color="default"
-                          size="small"
-                          variant="outlined"
-                        />
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        onClick={() => handleViewNGOs(need)}>
-                        {assignedNGOs[need.type] ? "Change NGO" : "Assign NGO"}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                        {isDeclined && (
+                          <Chip label="Declined" color="warning" size="small" />
+                        )}
+                        {!isAssigned && !isDeclined && (
+                          <Chip
+                            label={
+                              assignedNGOs[need.type] ? "Selected" : "Available"
+                            }
+                            color={assignedNGOs[need.type] ? "info" : "default"}
+                            size="small"
+                            variant="outlined"
+                          />
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {isAssigned && need.assignedTo ? (
+                          <Chip
+                            icon={<BusinessIcon />}
+                            label={getNgoName(need.assignedTo)}
+                            color="primary"
+                            size="small"
+                          />
+                        ) : assignedNGOs[need.type] ? (
+                          <Chip
+                            icon={<BusinessIcon />}
+                            label={getNgoName(assignedNGOs[need.type])}
+                            color="info"
+                            size="small"
+                            variant="outlined"
+                          />
+                        ) : (
+                          <Chip
+                            label="Not assigned"
+                            color="default"
+                            size="small"
+                            variant="outlined"
+                          />
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: "flex", gap: 1 }}>
+                          {!isAssigned && (
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              onClick={() => handleViewNGOs(need)}>
+                              {assignedNGOs[need.type] ? "Change" : "Select"}{" "}
+                              NGO
+                            </Button>
+                          )}
+                          {canEdit && (
+                            <>
+                              <IconButton
+                                size="small"
+                                color="primary"
+                                onClick={() => handleEditNeed(need, index)}
+                                title="Edit need">
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => handleDeleteNeed(need, index)}
+                                title="Delete need"
+                                disabled={request.needs.length === 1}>
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </>
+                          )}
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </TableContainer>
@@ -400,20 +555,24 @@ const RequestDetails = () => {
             </Box>
           )}
 
-          {!allNeedsAssigned && request.needs.length > 0 && (
+          {!allNeedsAssigned && unassignedNeeds.length > 0 && (
             <Box
               sx={{
                 mt: 3,
                 p: 2,
-                bgcolor: "warning.lighter",
+                bgcolor: "info.lighter",
                 borderRadius: 1,
                 border: "1px solid",
-                borderColor: "warning.main",
+                borderColor: "info.main",
               }}>
-              <Typography variant="body2" color="warning.dark">
-                ⚠️ Please assign an NGO to all needs before proceeding.
-                {request.needs.length - Object.keys(assignedNGOs).length}{" "}
-                need(s) remaining.
+              <Typography variant="body2" color="info.dark">
+                ℹ️ You can assign individual needs to NGOs or select multiple
+                needs and assign them together.
+                {unassignedNeeds.length -
+                  Object.keys(assignedNGOs).filter((key) =>
+                    unassignedNeeds.some((n) => n.type === key)
+                  ).length}{" "}
+                need(s) remaining unassigned.
               </Typography>
             </Box>
           )}
@@ -430,11 +589,11 @@ const RequestDetails = () => {
               variant="contained"
               color="primary"
               onClick={handleAssignAll}
-              disabled={!allNeedsAssigned || loading}
+              disabled={Object.keys(assignedNGOs).length === 0 || loading}
               startIcon={
                 loading ? <CircularProgress size={20} /> : <LocalShippingIcon />
               }>
-              {loading ? "Assigning..." : "Assign All & Complete"}
+              {loading ? "Assigning..." : "Assign Selected Needs"}
             </Button>
           </Box>
         </CardContent>
@@ -540,6 +699,80 @@ const RequestDetails = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenNgoDialog(false)}>Cancel</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit Need Dialog */}
+      <Dialog
+        open={editDialogOpen}
+        onClose={() => setEditDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth>
+        <DialogTitle>Edit Need</DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 2 }}>
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel>Need Type</InputLabel>
+              <Select
+                value={editNeedType}
+                label="Need Type"
+                onChange={(e) => setEditNeedType(e.target.value)}>
+                <MenuItem value="rescue">Rescue</MenuItem>
+                <MenuItem value="food">Food</MenuItem>
+                <MenuItem value="water">Water</MenuItem>
+                <MenuItem value="medical">Medical Assistance</MenuItem>
+                <MenuItem value="shelter">Shelter</MenuItem>
+                <MenuItem value="baby_supplies">Baby Supplies</MenuItem>
+                <MenuItem value="sanitation">Sanitation</MenuItem>
+                <MenuItem value="transport">Transport</MenuItem>
+                <MenuItem value="power_charging">Power/Charging</MenuItem>
+              </Select>
+            </FormControl>
+            <TextField
+              fullWidth
+              type="number"
+              label="Quantity"
+              value={editNeedQuantity}
+              onChange={(e) => setEditNeedQuantity(parseInt(e.target.value))}
+              inputProps={{ min: 1 }}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+          <Button
+            onClick={handleSaveEdit}
+            variant="contained"
+            color="primary"
+            disabled={!editNeedType || editNeedQuantity < 1}>
+            Save Changes
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Need Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        maxWidth="sm">
+        <DialogTitle>Confirm Delete</DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Are you sure you want to delete this need?
+          </Alert>
+          {needToDelete && (
+            <Typography variant="body1">
+              <strong>Need Type:</strong> {needToDelete.type}
+              <br />
+              <strong>Quantity:</strong> {needToDelete.quantity}
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+          <Button onClick={confirmDeleteNeed} variant="contained" color="error">
+            Delete
+          </Button>
         </DialogActions>
       </Dialog>
     </Container>

@@ -95,7 +95,7 @@ function AppContent() {
         <Route
           path="/ngo"
           element={
-            <ProtectedRoute roles={["ngo"]}>
+            <ProtectedRoute roles={["ngo_member"]}>
               <NGO />
             </ProtectedRoute>
           }

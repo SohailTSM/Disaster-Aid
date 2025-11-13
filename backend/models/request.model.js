@@ -40,6 +40,13 @@ const requestSchema = new Schema({
         required: true,
       },
       quantity: { type: Number, required: true, min: 1 },
+      assignmentStatus: {
+        type: String,
+        enum: ["unassigned", "assigned", "declined"],
+        default: "unassigned",
+      },
+      assignedTo: { type: Schema.Types.ObjectId, ref: "Organization" },
+      assignmentId: { type: Schema.Types.ObjectId, ref: "Assignment" },
     },
   ],
   beneficiaries_adults: { type: Number, default: 0 },

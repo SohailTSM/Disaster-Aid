@@ -5,6 +5,7 @@ const createAssignment = async (
   requestId,
   organizationId,
   dispatcherId,
+  assignedNeeds = [],
   notes = ""
 ) => {
   const reqDoc = await Request.findById(requestId);
@@ -14,36 +15,86 @@ const createAssignment = async (
     throw e;
   }
 
-  // Allow multiple assignments per request (one per need type)
-  // Check if this specific organization is already assigned to this request
-  const existing = await Assignment.findOne({
-    requestId,
-    organizationId,
-    status: { $in: ["New", "In-Progress"] },
-  });
+  // Validate that assignedNeeds are part of the request
+  if (assignedNeeds.length === 0) {
+    const e = new Error("No needs specified for assignment");
+    e.status = 400;
+    throw e;
+  }
 
-  if (existing) {
+  const requestNeedTypes = reqDoc.needs.map((n) => n.type);
+  const invalidNeeds = assignedNeeds.filter(
+    (needType) => !requestNeedTypes.includes(needType)
+  );
+  if (invalidNeeds.length > 0) {
+    const e = new Error(`Invalid need types: ${invalidNeeds.join(", ")}`);
+    e.status = 400;
+    throw e;
+  }
+
+  // Check if any of these needs are already assigned
+  const alreadyAssigned = reqDoc.needs.filter(
+    (need) =>
+      assignedNeeds.includes(need.type) && need.assignmentStatus === "assigned"
+  );
+  if (alreadyAssigned.length > 0) {
     const e = new Error(
-      "This organization is already assigned to this request"
+      `Some needs are already assigned: ${alreadyAssigned
+        .map((n) => n.type)
+        .join(", ")}`
     );
     e.status = 400;
     throw e;
   }
 
-  const ass = new Assignment({
+  // Check if there's an existing assignment for this request and organization
+  const existingAssignment = await Assignment.findOne({
     requestId,
     organizationId,
-    dispatcherId,
-    notes,
-    status: "New",
+    status: { $in: ["Pending", "Accepted", "Processing", "In-Transit"] }, // Active statuses
   });
-  await ass.save();
+
+  let ass;
+  if (existingAssignment) {
+    // Club the new needs to the existing assignment
+    const combinedNeeds = [
+      ...new Set([...existingAssignment.assignedNeeds, ...assignedNeeds]),
+    ];
+    existingAssignment.assignedNeeds = combinedNeeds;
+    existingAssignment.notes = notes
+      ? `${existingAssignment.notes}\n${notes}`
+      : existingAssignment.notes;
+    await existingAssignment.save();
+    ass = existingAssignment;
+  } else {
+    // Create a new assignment
+    ass = new Assignment({
+      requestId,
+      organizationId,
+      dispatcherId,
+      assignedNeeds,
+      notes,
+      status: "Pending",
+    });
+    await ass.save();
+  }
+
+  // Update the needs in the request to mark them as assigned
+  assignedNeeds.forEach((needType) => {
+    const needIndex = reqDoc.needs.findIndex((n) => n.type === needType);
+    if (needIndex !== -1) {
+      reqDoc.needs[needIndex].assignmentStatus = "assigned";
+      reqDoc.needs[needIndex].assignedTo = organizationId;
+      reqDoc.needs[needIndex].assignmentId = ass._id;
+    }
+  });
 
   // Update request status to In-Progress if it's New or Triaged
   if (reqDoc.status === "New" || reqDoc.status === "Triaged") {
     reqDoc.status = "In-Progress";
-    await reqDoc.save();
   }
+
+  await reqDoc.save();
 
   return ass;
 };
