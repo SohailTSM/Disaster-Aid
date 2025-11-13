@@ -4,8 +4,34 @@ const Schema = mongoose.Schema;
 
 const organizationSchema = new Schema({
   name: { type: String, required: true },
+  headName: { type: String, required: true },
   contactEmail: { type: String },
-  contactPhone: { type: String },
+  contactPhone: { type: String, required: true },
+  address: { type: String, required: true },
+  location: {
+    type: { type: String, enum: ["Point"], default: "Point" },
+    coordinates: { type: [Number], required: true }, // [lng, lat]
+  },
+  offers: [
+    {
+      type: {
+        type: String,
+        enum: [
+          "rescue",
+          "food",
+          "water",
+          "medical",
+          "shelter",
+          "baby_supplies",
+          "sanitation",
+          "transport",
+          "power_charging",
+        ],
+        required: true,
+      },
+      quantity: { type: Number, required: true, min: 1 },
+    },
+  ],
   verificationStatus: {
     type: String,
     enum: ["pending", "verified", "rejected"],
@@ -18,11 +44,6 @@ const organizationSchema = new Schema({
     rejectedAt: { type: Date },
     rejectionReason: { type: String },
   },
-  location: {
-    type: { type: String, enum: ["Point"], default: "Point" },
-    coordinates: { type: [Number], default: [0, 0] }, // [lng, lat]
-  },
-  address: { type: String },
   createdAt: { type: Date, default: Date.now },
 });
 

@@ -24,18 +24,22 @@ const requestSchema = new Schema({
   additionalAddressDetails: { type: String }, // Optional additional address info
   needs: [
     {
-      type: String,
-      enum: [
-        "rescue",
-        "food",
-        "water",
-        "medical",
-        "shelter",
-        "baby_supplies",
-        "sanitation",
-        "transport",
-        "power_charging",
-      ],
+      type: {
+        type: String,
+        enum: [
+          "rescue",
+          "food",
+          "water",
+          "medical",
+          "shelter",
+          "baby_supplies",
+          "sanitation",
+          "transport",
+          "power_charging",
+        ],
+        required: true,
+      },
+      quantity: { type: Number, required: true, min: 1 },
     },
   ],
   beneficiaries_adults: { type: Number, default: 0 },

@@ -86,6 +86,7 @@ const requestSchema = yup.object().shape({
 
 export default function RequestForm() {
   const [submitted, setSubmitted] = useState(false);
+  const [submittedRequestId, setSubmittedRequestId] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -129,6 +130,48 @@ export default function RequestForm() {
   const selectedNeeds = watch("selectedNeeds") || [];
   const addressText = watch("addressText") || "";
 
+  const initializeMap = () => {
+    if (!mapContainerRef.current) return;
+
+    // Avoid re-initializing if map already exists
+    if (map) return;
+
+    try {
+      const newMap = window.L.map(mapContainerRef.current).setView(
+        [20.5937, 78.9629],
+        5
+      );
+
+      window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "© OpenStreetMap contributors",
+        maxZoom: 19,
+      }).addTo(newMap);
+
+      const newMarker = window.L.marker([20.5937, 78.9629], {
+        draggable: true,
+      }).addTo(newMap);
+
+      newMarker.on("dragend", function (e) {
+        const pos = e.target.getLatLng();
+        setPosition([pos.lng, pos.lat]);
+        reverseGeocode(pos.lat, pos.lng);
+      });
+
+      newMap.on("click", function (e) {
+        newMarker.setLatLng(e.latlng);
+        setPosition([e.latlng.lng, e.latlng.lat]);
+        reverseGeocode(e.latlng.lat, e.latlng.lng);
+      });
+
+      setMap(newMap);
+      setMarker(newMarker);
+
+      requestCurrentLocation(newMap, newMarker);
+    } catch (error) {
+      console.error("Map initialization error:", error);
+    }
+  };
+
   useEffect(() => {
     if (!document.getElementById("leaflet-css")) {
       const link = document.createElement("link");
@@ -150,44 +193,11 @@ export default function RequestForm() {
     return () => {
       if (map) {
         map.remove();
+        setMap(null);
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const initializeMap = () => {
-    if (!mapContainerRef.current || map) return;
-
-    const newMap = window.L.map(mapContainerRef.current).setView(
-      [20.5937, 78.9629],
-      5
-    );
-
-    window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "© OpenStreetMap contributors",
-      maxZoom: 19,
-    }).addTo(newMap);
-
-    const newMarker = window.L.marker([20.5937, 78.9629], {
-      draggable: true,
-    }).addTo(newMap);
-
-    newMarker.on("dragend", function (e) {
-      const pos = e.target.getLatLng();
-      setPosition([pos.lng, pos.lat]);
-      reverseGeocode(pos.lat, pos.lng);
-    });
-
-    newMap.on("click", function (e) {
-      newMarker.setLatLng(e.latlng);
-      setPosition([e.latlng.lng, e.latlng.lat]);
-      reverseGeocode(e.latlng.lat, e.latlng.lng);
-    });
-
-    setMap(newMap);
-    setMarker(newMarker);
-
-    requestCurrentLocation(newMap, newMarker);
-  };
 
   const requestCurrentLocation = (mapInstance, markerInstance) => {
     setLocationLoading(true);
@@ -362,6 +372,12 @@ export default function RequestForm() {
         throw new Error("Please specify at least one beneficiary");
       }
 
+      // Convert needs array to include quantities
+      const needsWithQuantities = data.selectedNeeds.map((needType) => ({
+        type: needType,
+        quantity: needsQuantities[needType] || totalBeneficiaries, // Default to total beneficiaries if not specified
+      }));
+
       const requestData = {
         contactName: data.contactName,
         contactPhone: data.contactPhone,
@@ -373,7 +389,7 @@ export default function RequestForm() {
         },
         addressText: data.addressText,
         additionalAddressDetails: data.additionalAddressDetails || "",
-        needs: data.selectedNeeds,
+        needs: needsWithQuantities,
         beneficiaries_children: data.beneficiaries_children || 0,
         beneficiaries_adults: data.beneficiaries_adults || 0,
         beneficiaries_elderly: data.beneficiaries_elderly || 0,
@@ -394,8 +410,10 @@ export default function RequestForm() {
         // TODO: Implement actual file upload to cloud storage (AWS S3, Cloudinary, etc.)
       }
 
-      await requestService.createRequest(requestData);
+      const response = await requestService.createRequest(requestData);
 
+      // Store the requestId from the response
+      setSubmittedRequestId(response.requestId);
       setSubmitted(true);
       reset();
       setPosition(null);
@@ -421,12 +439,43 @@ export default function RequestForm() {
             <Typography variant="h5" gutterBottom color="success.main">
               ✓ Request Submitted Successfully!
             </Typography>
+            {submittedRequestId && (
+              <Box
+                sx={{ my: 3, p: 2, bgcolor: "primary.light", borderRadius: 2 }}>
+                <Typography
+                  variant="h6"
+                  gutterBottom
+                  color="primary.contrastText">
+                  Your Request ID
+                </Typography>
+                <Typography
+                  variant="h4"
+                  sx={{
+                    fontWeight: "bold",
+                    letterSpacing: 2,
+                    fontFamily: "monospace",
+                    color: "primary.contrastText",
+                  }}>
+                  {submittedRequestId}
+                </Typography>
+                <Typography
+                  variant="body2"
+                  sx={{ mt: 1, color: "primary.contrastText" }}>
+                  Please save this Request ID for future reference and tracking
+                </Typography>
+              </Box>
+            )}
             <Typography color="text.secondary" paragraph>
               Thank you for reaching out. Your request has been received and our
               team will contact you shortly.
             </Typography>
           </Box>
-          <Button variant="contained" onClick={() => setSubmitted(false)}>
+          <Button
+            variant="contained"
+            onClick={() => {
+              setSubmitted(false);
+              setSubmittedRequestId(null);
+            }}>
             Submit Another Request
           </Button>
         </Paper>

@@ -1,6 +1,12 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { authService } from '../services/api';
-import { toast } from 'react-toastify';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
+import { authService } from "../services/api";
+import { toast } from "react-toastify";
 
 export const AuthContext = createContext(null);
 
@@ -8,7 +14,6 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [navigateTo, setNavigateTo] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('token'));
 
   // This will be called by the RouterProvider after the router is set up
   const setNavigate = useCallback((navigate) => {
@@ -16,119 +21,126 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // Helper function to handle navigation safely
-  const safeNavigate = useCallback((to) => {
-    if (navigateTo) {
-      navigateTo(to);
-    } else {
-      console.warn('Navigation not available yet');
-    }
-  }, [navigateTo]);
+  const safeNavigate = useCallback(
+    (to) => {
+      if (navigateTo) {
+        navigateTo(to);
+      } else {
+        console.warn("Navigation not available yet");
+      }
+    },
+    [navigateTo]
+  );
 
-  // Load user data from token
+  // Load user data on mount by calling /me endpoint
   const loadUser = useCallback(async () => {
     try {
-      // In a real app, you might want to validate the token with the server
-      const userData = JSON.parse(localStorage.getItem('user'));
-      if (userData) {
-        setUser(userData);
+      // Call the /me endpoint which will use the httpOnly cookie
+      const response = await authService.me();
+      if (response?.user) {
+        setUser(response.user);
       }
     } catch (error) {
-      console.error('Error loading user data', error);
-      logout();
+      console.error("Error loading user data", error);
+      // If we can't load user, they're not authenticated
+      setUser(null);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (token) {
-      loadUser();
-    } else {
-      setLoading(false);
-    }
-  }, [token, loadUser]);
+    loadUser();
+  }, [loadUser]);
 
   const login = async (email, password) => {
     try {
       const response = await authService.login(email, password);
-      const { token: authToken, user: userData } = response;
-      
-      // Store token and user data
-      localStorage.setItem('token', authToken);
-      localStorage.setItem('user', JSON.stringify(userData));
-      
-      // Update state
-      setToken(authToken);
+      const { user: userData } = response;
+
+      // Cookie is automatically set by the backend
+      // Just update the user state
       setUser(userData);
-      
+
       // Show success message
-      toast.success(`Welcome back, ${userData.name || 'User'}!`);
-      
+      toast.success(`Welcome back, ${userData.name || "User"}!`);
+
       // Return the user data for role-based routing
       return userData;
     } catch (error) {
-      console.error('Login error:', error);
-      toast.error(error.response?.data?.message || 'Login failed. Please try again.');
+      console.error("Login error:", error);
+      toast.error(
+        error.response?.data?.message || "Login failed. Please try again."
+      );
       return false;
     }
   };
-  
+
   const register = async (userData) => {
     try {
       const response = await authService.register(userData);
-      const { token: authToken, user: registeredUser } = response;
-      
-      // Store token and user data
-      localStorage.setItem('token', authToken);
-      localStorage.setItem('user', JSON.stringify(registeredUser));
-      
-      // Update state
-      setToken(authToken);
+
+      // For NGO members, don't auto-login - they need admin approval first
+      if (userData.role === "ngo_member") {
+        // Show success message but don't store credentials
+        toast.success(
+          "NGO registration submitted! Please wait for admin approval."
+        );
+        return { success: true, requiresApproval: true };
+      }
+
+      // For other roles (dispatcher, etc.), proceed with auto-login
+      const { user: registeredUser } = response;
+
+      // Cookie is automatically set by the backend
+      // Just update the user state
       setUser(registeredUser);
-      
+
       // Show success message
-      toast.success('Registration successful!');
-      
+      toast.success("Registration successful!");
+
       // Redirect based on role
-      const redirectPath = registeredUser.role === 'ngo' ? '/ngo' : '/';
+      const redirectPath =
+        registeredUser.role === "dispatcher" ? "/dispatcher" : "/";
       safeNavigate(redirectPath);
-      
-      return true;
+
+      return { success: true, requiresApproval: false };
     } catch (error) {
-      console.error('Registration error:', error);
-      toast.error(error.response?.data?.message || 'Registration failed. Please try again.');
-      return false;
+      console.error("Registration error:", error);
+      toast.error(
+        error.response?.data?.message ||
+          "Registration failed. Please try again."
+      );
+      throw error;
     }
   };
-  
+
   const logout = () => {
-    // Clear local storage
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    
+    // Call logout endpoint to clear httpOnly cookie
+    authService.logout().catch((err) => console.error("Logout error:", err));
+
     // Reset state
-    setToken(null);
     setUser(null);
-    
+
     // Redirect to login
-    safeNavigate('/login');
+    safeNavigate("/login");
   };
-  
+
   const isAuthenticated = useCallback(() => {
-    // Check both token and user data
-    const storedToken = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
-    return !!(storedToken && storedUser);
-  }, []);
-  
+    // Check if user is loaded (cookie validation happens on server)
+    return !!user;
+  }, [user]);
+
   const hasRole = (role) => {
     return user?.role === role || user?.roles?.includes(role);
   };
-  
+
   const hasAnyRole = (roles) => {
     if (!user) return false;
-    return roles.includes(user.role) || 
-           (Array.isArray(user.roles) && user.roles.some(r => roles.includes(r)));
+    return (
+      roles.includes(user.role) ||
+      (Array.isArray(user.roles) && user.roles.some((r) => roles.includes(r)))
+    );
   };
 
   return (
@@ -143,8 +155,7 @@ export const AuthProvider = ({ children }) => {
         hasRole,
         hasAnyRole,
         setNavigate, // Expose setNavigate for the router
-      }}
-    >
+      }}>
       {children}
     </AuthContext.Provider>
   );
@@ -153,7 +164,7 @@ export const AuthProvider = ({ children }) => {
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };

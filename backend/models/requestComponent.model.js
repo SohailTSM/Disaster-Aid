@@ -18,6 +18,7 @@ const requestComponentSchema = new Schema({
     ],
     required: true,
   },
+  quantity: { type: Number, required: true, min: 1 },
   organizationId: { type: Schema.Types.ObjectId, ref: "Organization" },
   dispatcherId: { type: Schema.Types.ObjectId, ref: "User" },
   status: {

@@ -66,17 +66,36 @@ const exportIncidents = asyncHandler(async (req, res) => {
 // POST /api/organizations
 // Allows an admin or dispatcher to add a new NGO to the platform
 const createOrganization = asyncHandler(async (req, res) => {
-  const { name, contactEmail, contactPhone, address, location } = req.body;
-  if (!name) {
-    res.status(400);
-    throw new Error("Organization name is required");
-  }
-  const org = new Organization({
+  const {
     name,
+    headName,
     contactEmail,
     contactPhone,
     address,
-    location: location || { type: "Point", coordinates: [0, 0] },
+    location,
+    offers,
+  } = req.body;
+  if (!name || !headName || !contactPhone || !address || !location) {
+    res.status(400);
+    throw new Error(
+      "NGO name, head name, contact, address, and location are required"
+    );
+  }
+
+  // Validate location
+  if (!location.coordinates || location.coordinates.length !== 2) {
+    res.status(400);
+    throw new Error("Valid location coordinates are required");
+  }
+
+  const org = new Organization({
+    name,
+    headName,
+    contactEmail,
+    contactPhone,
+    address,
+    location,
+    offers: offers || [],
     verificationStatus: "pending",
   });
   await org.save();

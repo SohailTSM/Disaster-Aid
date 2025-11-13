@@ -54,11 +54,12 @@ const createRequest = async (data) => {
 
   await reqDoc.save();
 
-  // Create RequestComponents for each need type
+  // Create RequestComponents for each need with quantity
   if (data.needs && Array.isArray(data.needs) && data.needs.length > 0) {
-    const components = data.needs.map((needType) => ({
+    const components = data.needs.map((need) => ({
       requestId: reqDoc._id,
-      type: needType,
+      type: need.type,
+      quantity: need.quantity,
       status: "New",
     }));
     await RequestComponent.insertMany(components);

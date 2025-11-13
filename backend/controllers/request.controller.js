@@ -5,7 +5,11 @@ const requestService = require("../services/request.service");
 // POST /api/requests (public)
 const createRequest = asyncHandler(async (req, res) => {
   const created = await requestService.createRequest(req.body);
-  res.status(201).json({ request: created });
+  res.status(201).json({
+    request: created,
+    requestId: created.requestId,
+    message: `Request submitted successfully. Your Request ID is ${created.requestId}. Please save this for future reference.`,
+  });
 });
 
 // GET /api/requests (protected - dispatcher/authority)

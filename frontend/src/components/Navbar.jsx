@@ -1,7 +1,18 @@
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
-import { AppBar, Toolbar, Typography, Button, Box, Container, IconButton, Menu, MenuItem, Avatar } from '@mui/material';
-import { useAuth } from '../contexts/AuthContext';
-import { useState } from 'react';
+import { Link as RouterLink, useNavigate } from "react-router-dom";
+import {
+  AppBar,
+  Toolbar,
+  Typography,
+  Button,
+  Box,
+  Container,
+  IconButton,
+  Menu,
+  MenuItem,
+  Avatar,
+} from "@mui/material";
+import { useAuth } from "../contexts/AuthContext";
+import { useState } from "react";
 
 export default function Navbar() {
   const { user, isAuthenticated, logout } = useAuth();
@@ -20,14 +31,14 @@ export default function Navbar() {
   const handleLogout = () => {
     handleClose();
     logout();
-    navigate('/');
+    navigate("/");
   };
 
   const getInitials = (name) => {
     return name
-      .split(' ')
+      .split(" ")
       .map((n) => n[0])
-      .join('')
+      .join("")
       .toUpperCase();
   };
 
@@ -39,47 +50,49 @@ export default function Navbar() {
             variant="h6"
             noWrap
             component={RouterLink}
-            to={isAuthenticated() ? (user?.role === 'dispatcher' ? '/dispatcher' : '/ngo') : '/'}
+            to={
+              isAuthenticated()
+                ? user?.role === "dispatcher"
+                  ? "/dispatcher"
+                  : "/ngo"
+                : "/"
+            }
             sx={{
               mr: 2,
               fontWeight: 700,
-              color: 'inherit',
-              textDecoration: 'none',
-              '&:hover': {
-                opacity: 0.9
-              }
-            }}
-          >
+              color: "inherit",
+              textDecoration: "none",
+              "&:hover": {
+                opacity: 0.9,
+              },
+            }}>
             DisasterAid
           </Typography>
 
-          <Box sx={{ flexGrow: 1, display: 'flex', ml: 3 }}>
+          <Box sx={{ flexGrow: 1, display: "flex", ml: 3 }}>
             {!isAuthenticated() && (
               <Button
                 component={RouterLink}
                 to="/"
-                sx={{ my: 2, color: 'white', display: 'block' }}
-              >
+                sx={{ my: 2, color: "white", display: "block" }}>
                 Request Help
               </Button>
             )}
-            
-            {isAuthenticated() && user?.role === 'dispatcher' && (
+
+            {isAuthenticated() && user?.role === "dispatcher" && (
               <Button
                 component={RouterLink}
                 to="/dispatcher"
-                sx={{ my: 2, color: 'white', display: 'block' }}
-              >
+                sx={{ my: 2, color: "white", display: "block" }}>
                 Dispatcher Dashboard
               </Button>
             )}
-            
-            {isAuthenticated() && user?.role === 'ngo_member' && (
+
+            {isAuthenticated() && user?.role === "ngo_member" && (
               <Button
                 component={RouterLink}
                 to="/ngo"
-                sx={{ my: 2, color: 'white', display: 'block' }}
-              >
+                sx={{ my: 2, color: "white", display: "block" }}>
                 NGO Dashboard
               </Button>
             )}
@@ -93,27 +106,25 @@ export default function Navbar() {
                   size="small"
                   aria-controls="menu-appbar"
                   aria-haspopup="true"
-                  color="inherit"
-                >
-                  <Avatar sx={{ bgcolor: 'secondary.main' }}>
-                    {getInitials(user?.name || 'U')}
+                  color="inherit">
+                  <Avatar sx={{ bgcolor: "secondary.main" }}>
+                    {getInitials(user?.name || "U")}
                   </Avatar>
                 </IconButton>
                 <Menu
                   id="menu-appbar"
                   anchorEl={anchorEl}
                   anchorOrigin={{
-                    vertical: 'bottom',
-                    horizontal: 'right',
+                    vertical: "bottom",
+                    horizontal: "right",
                   }}
                   keepMounted
                   transformOrigin={{
-                    vertical: 'top',
-                    horizontal: 'right',
+                    vertical: "top",
+                    horizontal: "right",
                   }}
                   open={open}
-                  onClose={handleClose}
-                >
+                  onClose={handleClose}>
                   <MenuItem disabled>{user?.name}</MenuItem>
                   <MenuItem disabled>{user?.email}</MenuItem>
                   <MenuItem onClick={handleLogout}>Logout</MenuItem>
@@ -125,8 +136,7 @@ export default function Navbar() {
                   component={RouterLink}
                   to="/login"
                   color="inherit"
-                  sx={{ mx: 1 }}
-                >
+                  sx={{ mx: 1 }}>
                   Login
                 </Button>
                 <Button
@@ -134,9 +144,8 @@ export default function Navbar() {
                   to="/register"
                   variant="outlined"
                   color="inherit"
-                  sx={{ ml: 1 }}
-                >
-                  Register
+                  sx={{ ml: 1 }}>
+                  Register Your NGO
                 </Button>
               </>
             )}
