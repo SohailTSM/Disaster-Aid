@@ -1,7 +1,7 @@
-const asyncHandler = require('express-async-handler');
-const Request = require('../models/request.model');
-const RequestComponent = require('../models/requestComponent.model');
-const Counter = require('../models/counter.model');
+const asyncHandler = require("express-async-handler");
+const Request = require("../models/request.model");
+const RequestComponent = require("../models/requestComponent.model");
+const Counter = require("../models/counter.model");
 
 const validateLocation = (location) => {
   if (!location || !location.type || !Array.isArray(location.coordinates)) {
@@ -56,10 +56,10 @@ const createRequest = async (data) => {
 
   // Create RequestComponents for each need type
   if (data.needs && Array.isArray(data.needs) && data.needs.length > 0) {
-    const components = data.needs.map(needType => ({
+    const components = data.needs.map((needType) => ({
       requestId: reqDoc._id,
       type: needType,
-      status: 'New'
+      status: "New",
     }));
     await RequestComponent.insertMany(components);
   }
