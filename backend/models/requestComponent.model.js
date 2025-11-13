@@ -5,8 +5,8 @@ const requestComponentSchema = new Schema({
   requestId: { type: Schema.Types.ObjectId, ref: 'Request', required: true },
   type: {
     type: String,
-    enum: ['rescue', 'food', 'water', 'medical', 'shelter', 'bed', 'first_aid'],
-    required: true
+    enum: ['rescue', 'food', 'water', 'medical', 'shelter', 'baby_supplies', 'sanitation', 'transport', 'power_charging'],
+    required: true,
   },
   organizationId: { type: Schema.Types.ObjectId, ref: 'Organization' },
   dispatcherId: { type: Schema.Types.ObjectId, ref: 'User' },
