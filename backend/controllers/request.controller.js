@@ -35,7 +35,7 @@ const getRequest = asyncHandler(async (req, res) => {
 
 // PUT /api/requests/:id (dispatcher)
 const updateRequest = asyncHandler(async (req, res) => {
-  const { status, notes } = req.body;
+  const { status, notes, needs } = req.body;
   const reqDoc = await Request.findById(req.params.id);
   if (!reqDoc) {
     res.status(404);
@@ -43,6 +43,7 @@ const updateRequest = asyncHandler(async (req, res) => {
   }
   if (status) reqDoc.status = status;
   if (notes) reqDoc.notes = notes;
+  if (needs) reqDoc.needs = needs;
   await reqDoc.save();
   res.json({ message: "Request updated", request: reqDoc });
 });

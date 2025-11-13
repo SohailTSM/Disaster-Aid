@@ -1,5 +1,11 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
+import { useState, useEffect } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
+import {
+  requestService,
+  organizationService,
+  assignmentService,
+} from "../services/api";
+import { toast } from "react-toastify";
 import {
   Box,
   Button,
@@ -21,134 +27,63 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Grid
-} from '@mui/material';
+  Grid,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Alert,
+} from "@mui/material";
 import {
   ArrowBack as ArrowBackIcon,
   CheckCircle as CheckCircleIcon,
   Business as BusinessIcon,
   LocalShipping as LocalShippingIcon,
-} from '@mui/icons-material';
-
-// Mock data for the request
-const mockRequest = {
-  id: 'REQ-12345',
-  contactName: 'John Doe',
-  contactPhone: '+1 (555) 123-4567',
-  location: '123 Main St, Anytown, CA 90210',
-  beneficiaries: 150,
-  status: 'Active',
-  type: 'Flood Relief',
-  priority: 'High',
-  date: '2023-11-13',
-  notes: 'Urgent supplies needed for flood-affected families. Many homes are underwater and people have lost everything.',
-  needs: [
-    {
-      type: 'Food',
-      quantity: 150,
-      items: ['Ready-to-eat meals', 'Bottled water', 'Snacks'],
-      assignedTo: 'ngo1'
-    },
-    {
-      type: 'Shelter',
-      quantity: 50,
-      items: ['Tents', 'Blankets', 'Sleeping bags'],
-      assignedTo: 'ngo3'
-    },
-    {
-      type: 'Medical',
-      quantity: 30,
-      items: ['First aid kits', 'Medicines', 'Hygiene kits'],
-      assignedTo: null
-    }
-  ]
-};
-
-// Mock NGO data
-const mockNGOs = [
-  { id: 'ngo1', name: 'Food Relief Foundation' },
-  { id: 'ngo2', name: 'Medical Aid International' },
-  { id: 'ngo3', name: 'Shelter for All' },
-  { id: 'ngo4', name: 'Rapid Response Team' }
-];
+} from "@mui/icons-material";
 
 const RequestDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const [request, setRequest] = useState(null);
+  const [ngos, setNgos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [assignedNGOs, setAssignedNGOs] = useState({});
+  const [error, setError] = useState("");
   const [selectedNeed, setSelectedNeed] = useState(null);
+  const [selectedNgo, setSelectedNgo] = useState("");
   const [openNgoDialog, setOpenNgoDialog] = useState(false);
+  const [assignedNGOs, setAssignedNGOs] = useState({});
 
   // Load request data when component mounts
   useEffect(() => {
     const loadRequest = async () => {
       try {
         setLoading(true);
-        console.log('Loading request with ID:', id);
-        
-        // Decode the ID if it was encoded
-        const decodedId = decodeURIComponent(id);
-        console.log('Decoded request ID:', decodedId);
-        
+        console.log("Loading request with ID:", id);
+
         // First check if we have the request in location state
         const requestFromState = location.state?.request;
-        
+
         if (requestFromState) {
-          console.log('Using request from location state');
+          console.log("Using request from location state");
           setRequest(requestFromState);
-          setLoading(false);
-          return;
+        } else {
+          // Fetch from API
+          console.log("Fetching request from API");
+          const response = await requestService.getRequestById(id);
+          setRequest(response.request);
         }
-        
-        // If not in location state, we'll use mock data
-        console.log('No request in location state, using mock data');
-        
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        const mockRequest = {
-          id: id || 'REQ-' + Math.floor(Math.random() * 10000),
-          contactName: 'John Doe',
-          contactPhone: '+1 (555) 123-4567',
-          location: '123 Main St, Anytown, CA 90210',
-          beneficiaries: 150,
-          status: 'Active',
-          type: 'Flood Relief',
-          priority: 'High',
-          date: '2023-11-13',
-          notes: 'Urgent supplies needed for flood-affected families. Many homes are underwater and people have lost everything.',
-          needs: [
-            {
-              type: 'Food',
-              quantity: 150,
-              items: ['Ready-to-eat meals', 'Bottled water', 'Snacks'],
-              assignedTo: null
-            },
-            {
-              type: 'Shelter',
-              quantity: 50,
-              items: ['Tents', 'Blankets', 'Sleeping bags'],
-              assignedTo: null
-            },
-            {
-              type: 'Medical',
-              quantity: 30,
-              items: ['First aid kits', 'Medicines', 'Hygiene kits'],
-              assignedTo: null
-            }
-          ]
-        };
-        
-        console.log('Setting mock request:', mockRequest);
-        setRequest(mockRequest);
+
+        // Fetch all NGOs for assignment (we'll filter approved ones in the UI)
+        const ngoResponse = await organizationService.getOrganizations();
+        console.log("Loaded NGOs:", ngoResponse.organizations);
+        setNgos(ngoResponse.organizations || []);
+
+        setLoading(false);
       } catch (err) {
-        console.error('Error loading request:', err);
-        setError('Failed to load request details');
-      } finally {
+        console.error("Error loading request:", err);
+        setError("Failed to load request details");
+        toast.error("Failed to load request details");
         setLoading(false);
       }
     };
@@ -156,107 +91,128 @@ const RequestDetails = () => {
     loadRequest();
   }, [id, location.state]);
 
+  // Just select the NGO for a need (no API call yet)
+  const handleSelectNGO = (ngoId) => {
+    if (!ngoId || !selectedNeed) {
+      toast.error("Please select an NGO");
+      return;
+    }
+
+    // Update local assignedNGOs state
+    setAssignedNGOs((prev) => ({
+      ...prev,
+      [selectedNeed.type]: ngoId,
+    }));
+
+    const ngoName = ngos.find((ngo) => ngo._id === ngoId)?.name || "NGO";
+    toast.success(`Selected ${ngoName} for ${selectedNeed.type}`);
+    setOpenNgoDialog(false);
+    setSelectedNeed(null);
+  };
+
   const handleViewNGOs = (need) => {
     setSelectedNeed(need);
     setOpenNgoDialog(true);
   };
 
-  const handleAssignNGO = (ngoId) => {
-    if (!selectedNeed) return;
-
-    setAssignedNGOs(prev => ({
-      ...prev,
-      [selectedNeed.type]: ngoId,
-    }));
-
-    setRequest(prev => ({
-      ...prev,
-      needs: prev.needs.map(need =>
-        need.type === selectedNeed.type
-          ? { ...need, assignedTo: ngoId }
-          : need
-      ),
-    }));
-
-    setOpenNgoDialog(false);
-  };
-
   const handleAssignAll = async () => {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      navigate('/dispatcher');
+      setLoading(true);
+
+      // Group needs by NGO
+      const ngoAssignments = {};
+      Object.entries(assignedNGOs).forEach(([needType, ngoId]) => {
+        if (!ngoAssignments[ngoId]) {
+          ngoAssignments[ngoId] = [];
+        }
+        const need = request.needs.find((n) => n.type === needType);
+        if (need) {
+          ngoAssignments[ngoId].push(need);
+        }
+      });
+
+      console.log("Creating assignments for NGOs:", ngoAssignments);
+
+      // Create one assignment per NGO with all their needs
+      const assignmentPromises = Object.entries(ngoAssignments).map(
+        ([ngoId, needs]) => {
+          const ngoName = ngos.find((ngo) => ngo._id === ngoId)?.name || "NGO";
+          const needsText = needs
+            .map((n) => `${n.type} (${n.quantity})`)
+            .join(", ");
+
+          console.log(`Creating assignment for ${ngoName}:`, needsText);
+
+          return assignmentService.createAssignment({
+            requestId: request._id,
+            organizationId: ngoId,
+            notes: `Assigned needs: ${needsText}`,
+          });
+        }
+      );
+
+      await Promise.all(assignmentPromises);
+
+      toast.success(
+        `Successfully assigned all needs to ${
+          Object.keys(ngoAssignments).length
+        } NGO(s)`
+      );
+      navigate("/dispatcher");
     } catch (err) {
-      console.error('Error updating request:', err);
-      setError('Failed to update request. Please try again.');
+      console.error("Error creating assignments:", err);
+      toast.error(
+        err.response?.data?.message ||
+          "Failed to create assignments. Please try again."
+      );
+      setLoading(false);
     }
   };
 
   const handleDecline = async () => {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      navigate('/dispatcher');
+      setLoading(true);
+      // Update request status to Closed
+      await requestService.updateRequest(request._id, { status: "Closed" });
+      toast.info("Request has been declined and closed");
+      navigate("/dispatcher");
     } catch (err) {
-      console.error('Error declining request:', err);
-      setError('Failed to decline request. Please try again.');
+      console.error("Error declining request:", err);
+      toast.error("Failed to decline request. Please try again.");
+      setLoading(false);
     }
   };
 
   const getNgoName = (ngoId) => {
-    if (!ngoId) return 'Not assigned';
-    const ngo = mockNGOs.find(n => n.id === ngoId);
-    return ngo ? ngo.name : 'Unknown NGO';
+    if (!ngoId) return "Not assigned";
+    const ngo = ngos.find((n) => n._id === ngoId);
+    return ngo ? ngo.name : "Unknown NGO";
   };
 
+  // Check for existing assignments when request loads
   useEffect(() => {
-    if (location.state?.request) {
-      const requestData = location.state.request;
-      setRequest(requestData);
+    if (request) {
       const initialAssignments = {};
-      requestData.needs?.forEach(need => {
+      request.needs?.forEach((need) => {
         if (need.assignedTo) {
           initialAssignments[need.type] = need.assignedTo;
         }
       });
       setAssignedNGOs(initialAssignments);
-      setLoading(false);
-      return;
     }
-
-    const fetchRequest = async () => {
-      try {
-        setTimeout(() => {
-          setRequest(mockRequest);
-          const initialAssignments = {};
-          mockRequest.needs.forEach(need => {
-            if (need.assignedTo) {
-              initialAssignments[need.type] = need.assignedTo;
-            }
-          });
-          setAssignedNGOs(initialAssignments);
-          setLoading(false);
-        }, 500);
-      } catch (err) {
-        setError('Failed to load request details');
-        console.error('Error:', err);
-        setLoading(false);
-      }
-    };
-
-    fetchRequest();
-  }, [id, location.state]);
+  }, [request]);
 
   if (loading) {
     return (
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '100vh',
-        flexDirection: 'column',
-        gap: 2
-      }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100vh",
+          flexDirection: "column",
+          gap: 2,
+        }}>
         <CircularProgress />
         <Typography>Loading request details...</Typography>
       </Box>
@@ -267,12 +223,11 @@ const RequestDetails = () => {
     return (
       <Container maxWidth="md" sx={{ mt: 4 }}>
         <Alert severity="error">{error}</Alert>
-        <Button 
-          variant="contained" 
-          color="primary" 
-          onClick={() => navigate(-1)}
-          sx={{ mt: 2 }}
-        >
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={() => navigate("/dispatcher")}
+          sx={{ mt: 2 }}>
           Go Back
         </Button>
       </Container>
@@ -282,44 +237,75 @@ const RequestDetails = () => {
   if (!request) {
     return (
       <Container maxWidth="md" sx={{ mt: 4 }}>
-        <Typography variant="h6" gutterBottom>Request not found</Typography>
-        <Button component={Link} to="/dispatcher" startIcon={<ArrowBackIcon />} sx={{ mt: 2 }}>
+        <Typography variant="h6" gutterBottom>
+          Request not found
+        </Typography>
+        <Button
+          onClick={() => navigate("/dispatcher")}
+          startIcon={<ArrowBackIcon />}
+          sx={{ mt: 2 }}>
           Back to Dashboard
         </Button>
       </Container>
     );
   }
 
-  const allNeedsAssigned = request.needs.every(need => assignedNGOs[need.type]);
+  const allNeedsAssigned = request.needs.every(
+    (need) => assignedNGOs[need.type]
+  );
 
   return (
     <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
-      <Button component={Link} to="/dispatcher" startIcon={<ArrowBackIcon />} sx={{ mb: 2 }}>
+      <Button
+        onClick={() => navigate("/dispatcher")}
+        startIcon={<ArrowBackIcon />}
+        sx={{ mb: 2 }}>
         Back to Dashboard
       </Button>
 
       <Card sx={{ mb: 4 }}>
         <CardContent>
-          <Typography variant="h5" gutterBottom>Request Details</Typography>
+          <Typography variant="h5" gutterBottom>
+            Request Details
+          </Typography>
           <Divider sx={{ my: 2 }} />
           <Grid container spacing={3}>
             <Grid item xs={12} md={6}>
-              <Typography variant="subtitle1"><strong>Request ID:</strong> {request.id}</Typography>
-              <Typography variant="subtitle1"><strong>Contact:</strong> {request.contactName}</Typography>
-              <Typography variant="subtitle1"><strong>Phone:</strong> {request.contactPhone}</Typography>
-              <Typography variant="subtitle1"><strong>Type:</strong> {request.type}</Typography>
+              <Typography variant="subtitle1">
+                <strong>Request ID:</strong> {request.requestId}
+              </Typography>
+              <Typography variant="subtitle1">
+                <strong>Contact:</strong> {request.contactName}
+              </Typography>
+              <Typography variant="subtitle1">
+                <strong>Phone:</strong> {request.contactPhone}
+              </Typography>
+              <Typography variant="subtitle1">
+                <strong>Priority:</strong> {request.priority}
+              </Typography>
             </Grid>
             <Grid item xs={12} md={6}>
-              <Typography variant="subtitle1"><strong>Location:</strong> {request.location}</Typography>
-              <Typography variant="subtitle1"><strong>Beneficiaries:</strong> {request.beneficiaries}</Typography>
-              <Typography variant="subtitle1"><strong>Status:</strong> {request.status}</Typography>
-              <Typography variant="subtitle1"><strong>Priority:</strong> {request.priority}</Typography>
+              <Typography variant="subtitle1">
+                <strong>Location:</strong> {request.addressText}
+              </Typography>
+              <Typography variant="subtitle1">
+                <strong>Beneficiaries:</strong>{" "}
+                {(request.beneficiaries_adults || 0) +
+                  (request.beneficiaries_children || 0) +
+                  (request.beneficiaries_elderly || 0)}
+              </Typography>
+              <Typography variant="subtitle1">
+                <strong>Status:</strong> {request.status}
+              </Typography>
+              <Typography variant="subtitle1">
+                <strong>SoS:</strong> {request.isSoS ? "Yes" : "No"}
+              </Typography>
             </Grid>
           </Grid>
-          {request.notes && (
-            <Box sx={{ mt: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
-              <Typography variant="subtitle2">Notes:</Typography>
-              <Typography variant="body2">{request.notes}</Typography>
+          {request.specialNeeds && (
+            <Box sx={{ mt: 2, p: 2, bgcolor: "action.hover", borderRadius: 1 }}>
+              <Typography variant="subtitle2">Special Needs:</Typography>
+              <Typography variant="body2">{request.specialNeeds}</Typography>
             </Box>
           )}
         </CardContent>
@@ -327,14 +313,15 @@ const RequestDetails = () => {
 
       <Card>
         <CardContent>
-          <Typography variant="h6" gutterBottom>Required Assistance</Typography>
+          <Typography variant="h6" gutterBottom>
+            Required Assistance
+          </Typography>
           <Divider sx={{ mb: 2 }} />
           <TableContainer component={Paper}>
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell>Need</TableCell>
-                  <TableCell>Items</TableCell>
+                  <TableCell>Need Type</TableCell>
                   <TableCell align="right">Quantity</TableCell>
                   <TableCell>Assigned To</TableCell>
                   <TableCell>Actions</TableCell>
@@ -344,23 +331,38 @@ const RequestDetails = () => {
                 {request.needs.map((need, index) => (
                   <TableRow key={index}>
                     <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                         {need.type}
-                        {assignedNGOs[need.type] && <CheckCircleIcon color="success" fontSize="small" />}
+                        {assignedNGOs[need.type] && (
+                          <CheckCircleIcon color="success" fontSize="small" />
+                        )}
                       </Box>
                     </TableCell>
-                    <TableCell>{need.items.join(', ')}</TableCell>
                     <TableCell align="right">{need.quantity}</TableCell>
                     <TableCell>
                       {assignedNGOs[need.type] ? (
-                        <Chip icon={<BusinessIcon />} label={getNgoName(assignedNGOs[need.type])} color="primary" size="small" />
+                        <Chip
+                          icon={<BusinessIcon />}
+                          label={getNgoName(assignedNGOs[need.type])}
+                          color="primary"
+                          size="small"
+                        />
                       ) : (
-                        <Chip label="Not assigned" color="default" size="small" variant="outlined" />
+                        <Chip
+                          label="Not assigned"
+                          color="default"
+                          size="small"
+                          variant="outlined"
+                        />
                       )}
                     </TableCell>
                     <TableCell>
-                      <Button variant="outlined" size="small" onClick={() => handleViewNGOs(need)}>
-                        {assignedNGOs[need.type] ? 'Change NGO' : 'Assign NGO'}
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => handleViewNGOs(need)}>
+                        {assignedNGOs[need.type] ? "Change NGO" : "Assign NGO"}
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -369,25 +371,84 @@ const RequestDetails = () => {
             </Table>
           </TableContainer>
 
-          <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between' }}>
-            <Button variant="outlined" color="error" onClick={handleDecline}>
+          {/* Assignment Summary */}
+          {Object.keys(assignedNGOs).length > 0 && (
+            <Box sx={{ mt: 3, p: 2, bgcolor: "action.hover", borderRadius: 1 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                Assignment Summary:
+              </Typography>
+              {Object.entries(
+                Object.entries(assignedNGOs).reduce(
+                  (acc, [needType, ngoId]) => {
+                    if (!acc[ngoId]) {
+                      acc[ngoId] = [];
+                    }
+                    acc[ngoId].push(needType);
+                    return acc;
+                  },
+                  {}
+                )
+              ).map(([ngoId, needTypes]) => (
+                <Box key={ngoId} sx={{ mb: 1 }}>
+                  <Typography variant="body2">
+                    <strong>{getNgoName(ngoId)}</strong> will handle:{" "}
+                    {needTypes.join(", ")}
+                    {needTypes.length > 1 && ` (${needTypes.length} needs)`}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          )}
+
+          {!allNeedsAssigned && request.needs.length > 0 && (
+            <Box
+              sx={{
+                mt: 3,
+                p: 2,
+                bgcolor: "warning.lighter",
+                borderRadius: 1,
+                border: "1px solid",
+                borderColor: "warning.main",
+              }}>
+              <Typography variant="body2" color="warning.dark">
+                ⚠️ Please assign an NGO to all needs before proceeding.
+                {request.needs.length - Object.keys(assignedNGOs).length}{" "}
+                need(s) remaining.
+              </Typography>
+            </Box>
+          )}
+
+          <Box sx={{ mt: 4, display: "flex", justifyContent: "space-between" }}>
+            <Button
+              variant="outlined"
+              color="error"
+              onClick={handleDecline}
+              disabled={loading}>
               Decline Request
             </Button>
             <Button
               variant="contained"
               color="primary"
               onClick={handleAssignAll}
-              disabled={!allNeedsAssigned}
-              startIcon={<LocalShippingIcon />}
-            >
-              Assign All & Complete
+              disabled={!allNeedsAssigned || loading}
+              startIcon={
+                loading ? <CircularProgress size={20} /> : <LocalShippingIcon />
+              }>
+              {loading ? "Assigning..." : "Assign All & Complete"}
             </Button>
           </Box>
         </CardContent>
       </Card>
 
-      <Dialog open={openNgoDialog} onClose={() => setOpenNgoDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>{selectedNeed && `Assign NGO for ${selectedNeed.type} (${selectedNeed.quantity} needed)`}</DialogTitle>
+      <Dialog
+        open={openNgoDialog}
+        onClose={() => setOpenNgoDialog(false)}
+        maxWidth="sm"
+        fullWidth>
+        <DialogTitle>
+          {selectedNeed &&
+            `Assign NGO for ${selectedNeed.type} (${selectedNeed.quantity} needed)`}
+        </DialogTitle>
         <DialogContent>
           {selectedNeed && (
             <TableContainer>
@@ -400,30 +461,78 @@ const RequestDetails = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {mockNGOs.map((ngo) => (
-                    <TableRow key={ngo.id}>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <BusinessIcon color="primary" />
-                          {ngo.name}
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        {['Food', 'Shelter', 'Medical'].map(capability => (
-                          <Chip key={capability} label={capability} size="small" sx={{ mr: 0.5, mb: 0.5 }} />
-                        ))}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          onClick={() => handleAssignNGO(ngo.id)}
-                        >
-                          {assignedNGOs[selectedNeed.type] === ngo.id ? 'Assigned' : 'Assign'}
-                        </Button>
+                  {ngos
+                    .filter(
+                      (ngo) =>
+                        (ngo.approved ||
+                          ngo.verificationStatus === "verified") &&
+                        !ngo.suspended &&
+                        ngo.offers?.some(
+                          (offer) => offer.type === selectedNeed.type
+                        )
+                    )
+                    .map((ngo) => (
+                      <TableRow key={ngo._id}>
+                        <TableCell>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                            }}>
+                            <BusinessIcon color="primary" />
+                            {ngo.name}
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          {ngo.offers
+                            ?.filter(
+                              (offer) => offer.type === selectedNeed.type
+                            )
+                            .map((offer, idx) => (
+                              <Chip
+                                key={idx}
+                                label={`${offer.type} (${offer.quantity} available)`}
+                                size="small"
+                                sx={{ mr: 0.5, mb: 0.5 }}
+                              />
+                            ))}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant={
+                              assignedNGOs[selectedNeed.type] === ngo._id
+                                ? "contained"
+                                : "outlined"
+                            }
+                            size="small"
+                            onClick={() => handleSelectNGO(ngo._id)}>
+                            {assignedNGOs[selectedNeed.type] === ngo._id
+                              ? "Selected"
+                              : "Select"}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  {ngos.filter(
+                    (ngo) =>
+                      (ngo.approved || ngo.verificationStatus === "verified") &&
+                      !ngo.suspended &&
+                      ngo.offers?.some(
+                        (offer) => offer.type === selectedNeed.type
+                      )
+                  ).length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={3} align="center">
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ py: 2 }}>
+                          No NGOs available for {selectedNeed.type}
+                        </Typography>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  )}
                 </TableBody>
               </Table>
             </TableContainer>

@@ -61,8 +61,9 @@ export const requestService = {
 
 export const organizationService = {
   // For admin
-  getOrganizations: async (verified = true) => {
-    const response = await api.get(`/organizations?verified=${verified}`);
+  getOrganizations: async (verified = null) => {
+    const params = verified !== null ? { verified } : {};
+    const response = await api.get("/organizations", { params });
     return response.data;
   },
   getPendingOrganizations: async () => {
