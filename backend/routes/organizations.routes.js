@@ -9,6 +9,8 @@ const {
   rejectOrganization,
   deleteOrganization,
   exportIncidents,
+  suspendOrganization,
+  unsuspendOrganization,
 } = require("../controllers/organization.controller");
 const auth = require("../middleware/auth.middleware");
 const allowedRoles = require("../middleware/roles.middleware");
@@ -17,6 +19,13 @@ const allowedRoles = require("../middleware/roles.middleware");
 router.get("/pending", auth, allowedRoles("admin"), listPendingOrganizations);
 router.put("/:id/approve", auth, allowedRoles("admin"), approveOrganization);
 router.put("/:id/reject", auth, allowedRoles("admin"), rejectOrganization);
+router.put("/:id/suspend", auth, allowedRoles("admin"), suspendOrganization);
+router.put(
+  "/:id/unsuspend",
+  auth,
+  allowedRoles("admin"),
+  unsuspendOrganization
+);
 router.delete("/:id", auth, allowedRoles("admin"), deleteOrganization);
 router.get("/export/incidents", auth, allowedRoles("admin"), exportIncidents);
 

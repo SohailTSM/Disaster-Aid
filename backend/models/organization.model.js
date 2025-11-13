@@ -38,6 +38,13 @@ const organizationSchema = new Schema({
     default: "pending",
   },
   approved: { type: Boolean, default: false },
+  suspended: { type: Boolean, default: false },
+  suspensionMetadata: {
+    suspendedBy: { type: Schema.Types.ObjectId, ref: "User" },
+    suspendedAt: { type: Date },
+    suspensionReason: { type: String },
+    unsuspendedAt: { type: Date },
+  },
   approvalMetadata: {
     approvedBy: { type: Schema.Types.ObjectId, ref: "User" },
     approvedAt: { type: Date },

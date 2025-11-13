@@ -129,6 +129,54 @@ const verifyOrganization = asyncHandler(async (req, res) => {
   res.json({ message: "Organization status updated", organization: org });
 });
 
+// PUT /api/organizations/:id/suspend (admin)
+const suspendOrganization = asyncHandler(async (req, res) => {
+  const org = await Organization.findById(req.params.id);
+  if (!org) {
+    res.status(404);
+    throw new Error("Organization not found");
+  }
+  org.suspended = true;
+  org.suspensionMetadata = org.suspensionMetadata || {};
+  org.suspensionMetadata.suspendedBy = req.user._id;
+  org.suspensionMetadata.suspendedAt = new Date();
+  org.suspensionMetadata.suspensionReason = req.body.reason || "";
+  await org.save();
+
+  // Also suspend all users from this organization
+  await User.updateMany(
+    { organizationId: org._id },
+    {
+      suspended: true,
+      suspensionMetadata: {
+        suspendedBy: req.user._id,
+        suspendedAt: new Date(),
+        suspensionReason: `Organization suspended: ${req.body.reason || ""}`,
+      },
+    }
+  );
+
+  res.json({ message: "Organization suspended", organization: org });
+});
+
+// PUT /api/organizations/:id/unsuspend (admin)
+const unsuspendOrganization = asyncHandler(async (req, res) => {
+  const org = await Organization.findById(req.params.id);
+  if (!org) {
+    res.status(404);
+    throw new Error("Organization not found");
+  }
+  org.suspended = false;
+  org.suspensionMetadata = org.suspensionMetadata || {};
+  org.suspensionMetadata.unsuspendedAt = new Date();
+  await org.save();
+
+  // Also unsuspend all users from this organization
+  await User.updateMany({ organizationId: org._id }, { suspended: false });
+
+  res.json({ message: "Organization unsuspended", organization: org });
+});
+
 module.exports = {
   createOrganization,
   listOrganizations,
@@ -138,4 +186,6 @@ module.exports = {
   rejectOrganization,
   deleteOrganization,
   exportIncidents,
+  suspendOrganization,
+  unsuspendOrganization,
 };

@@ -81,6 +81,14 @@ export const organizationService = {
     const response = await api.put(`/organizations/${id}/reject`);
     return response.data;
   },
+  suspendOrganization: async (id, reason) => {
+    const response = await api.put(`/organizations/${id}/suspend`, { reason });
+    return response.data;
+  },
+  unsuspendOrganization: async (id) => {
+    const response = await api.put(`/organizations/${id}/unsuspend`);
+    return response.data;
+  },
   deleteOrganization: async (id) => {
     const response = await api.delete(`/organizations/${id}`);
     return response.data;
@@ -115,6 +123,44 @@ export const assignmentService = {
   },
   getAssignment: async (id) => {
     const response = await api.get(`/assignments/${id}`);
+    return response.data;
+  },
+};
+
+export const userService = {
+  // Dispatcher management
+  createDispatcher: async (userData) => {
+    const response = await api.post("/users/create-dispatcher", userData);
+    return response.data;
+  },
+  getDispatchers: async () => {
+    const response = await api.get("/users/dispatchers");
+    return response.data;
+  },
+
+  // Authority management
+  createAuthority: async (userData) => {
+    const response = await api.post("/users/create-authority", userData);
+    return response.data;
+  },
+  getAuthorities: async () => {
+    const response = await api.get("/users/authorities");
+    return response.data;
+  },
+
+  // Suspend/unsuspend
+  suspendUser: async (id, reason) => {
+    const response = await api.put(`/users/${id}/suspend`, { reason });
+    return response.data;
+  },
+  unsuspendUser: async (id) => {
+    const response = await api.put(`/users/${id}/unsuspend`);
+    return response.data;
+  },
+
+  // Delete user
+  deleteUser: async (id) => {
+    const response = await api.delete(`/users/${id}`);
     return response.data;
   },
 };

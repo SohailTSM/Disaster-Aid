@@ -54,6 +54,8 @@ export default function Navbar() {
               isAuthenticated()
                 ? user?.role === "dispatcher"
                   ? "/dispatcher"
+                  : user?.role === "admin"
+                  ? "/admin"
                   : "/ngo"
                 : "/"
             }
@@ -94,6 +96,15 @@ export default function Navbar() {
                 to="/ngo"
                 sx={{ my: 2, color: "white", display: "block" }}>
                 NGO Dashboard
+              </Button>
+            )}
+
+            {isAuthenticated() && user?.role === "admin" && (
+              <Button
+                component={RouterLink}
+                to="/admin"
+                sx={{ my: 2, color: "white", display: "block" }}>
+                Admin Dashboard
               </Button>
             )}
           </Box>
