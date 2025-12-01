@@ -255,4 +255,19 @@ export const advisoryService = {
   },
 };
 
+export const analyticsService = {
+  // Get crisis load dashboard data (authority)
+  getCrisisLoadDashboard: async () => {
+    const response = await api.get("/analytics/crisis-load");
+    return response.data;
+  },
+  // Get resource trends over time (authority)
+  getResourceTrend: async (days = 7) => {
+    const response = await api.get("/analytics/resource-trend", {
+      params: { days },
+    });
+    return response.data;
+  },
+};
+
 export default api;

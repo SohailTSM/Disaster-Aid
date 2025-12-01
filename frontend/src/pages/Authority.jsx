@@ -30,6 +30,8 @@ import {
   Alert,
   LinearProgress,
   CircularProgress,
+  Tooltip,
+  Divider,
 } from "@mui/material";
 import {
   Dashboard as DashboardIcon,
@@ -44,9 +46,16 @@ import {
   CheckCircle as CompletedIcon,
   HourglassEmpty as PendingIcon,
   LocalShipping as InProgressIcon,
+  TrendingUp as TrendingUpIcon,
+  TrendingDown as TrendingDownIcon,
+  Warning as WarningIcon,
+  ErrorOutline as ErrorIcon,
+  Map as MapIcon,
+  BarChart as BarChartIcon,
 } from "@mui/icons-material";
-import { requestService, advisoryService } from "../services/api";
+import { requestService, advisoryService, analyticsService } from "../services/api";
 import { toast } from "react-toastify";
+import CrisisHeatmap from "../components/CrisisHeatmap";
 
 const Authority = () => {
   const [activeTab, setActiveTab] = useState(0);
@@ -102,10 +111,28 @@ const Authority = () => {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [loadingRequestDetails, setLoadingRequestDetails] = useState(false);
 
+  // Crisis Load Dashboard state
+  const [crisisData, setCrisisData] = useState(null);
+  const [crisisLoading, setCrisisLoading] = useState(false);
+
   useEffect(() => {
     fetchRequests();
     fetchAdvisories();
+    fetchCrisisData();
   }, []);
+
+  const fetchCrisisData = async () => {
+    try {
+      setCrisisLoading(true);
+      const data = await analyticsService.getCrisisLoadDashboard();
+      setCrisisData(data);
+    } catch (error) {
+      console.error("Error fetching crisis data:", error);
+      toast.error("Failed to load crisis analytics");
+    } finally {
+      setCrisisLoading(false);
+    }
+  };
 
   const fetchRequests = async () => {
     try {
@@ -519,6 +546,442 @@ const Authority = () => {
     </Box>
   );
 
+  // Helper function to get color based on coverage percentage
+  const getCoverageColor = (coverage) => {
+    if (coverage >= 80) return "success";
+    if (coverage >= 50) return "warning";
+    return "error";
+  };
+
+  // Helper function to format resource type for display
+  const formatResourceType = (type) => {
+    return type
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  };
+
+  // Helper function to get heatmap cell color
+  const getHeatmapColor = (value, max) => {
+    if (max === 0) return "rgba(76, 175, 80, 0.1)";
+    const intensity = Math.min(value / max, 1);
+    if (intensity > 0.7) return "rgba(244, 67, 54, 0.7)";
+    if (intensity > 0.4) return "rgba(255, 152, 0, 0.5)";
+    if (intensity > 0.1) return "rgba(255, 193, 7, 0.3)";
+    return "rgba(76, 175, 80, 0.1)";
+  };
+
+  const CrisisLoadDashboardPanel = () => {
+    if (crisisLoading) {
+      return (
+        <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
+          <CircularProgress />
+        </Box>
+      );
+    }
+
+    if (!crisisData) {
+      return (
+        <Alert severity="info">
+          No crisis data available. Click refresh to load data.
+        </Alert>
+      );
+    }
+
+    const maxNeed = Math.max(...Object.values(crisisData.needsVsOffers?.needs || {}), 1);
+
+    return (
+      <Box>
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
+          <Typography variant="h5">Crisis Load Dashboard</Typography>
+          <Button variant="outlined" onClick={fetchCrisisData} startIcon={<DashboardIcon />}>
+            Refresh Data
+          </Button>
+        </Box>
+
+        {/* Summary Cards */}
+        <Grid container spacing={2} sx={{ mb: 4 }}>
+          <Grid item xs={12} sm={6} md={2}>
+            <Card>
+              <CardContent>
+                <Typography color="text.secondary" variant="body2">Active Requests</Typography>
+                <Typography variant="h4">{crisisData.summary?.totalActiveRequests || 0}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={6} md={2}>
+            <Card>
+              <CardContent>
+                <Typography color="text.secondary" variant="body2">Total NGOs</Typography>
+                <Typography variant="h4">{crisisData.summary?.totalOrganizations || 0}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={6} md={2}>
+            <Card>
+              <CardContent>
+                <Typography color="text.secondary" variant="body2">Beneficiaries</Typography>
+                <Typography variant="h4">{crisisData.summary?.totalBeneficiaries || 0}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={6} md={2}>
+            <Card sx={{ bgcolor: "error.light" }}>
+              <CardContent>
+                <Typography color="error.contrastText" variant="body2">SOS Requests</Typography>
+                <Typography variant="h4" color="error.contrastText">{crisisData.summary?.sosRequests || 0}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={6} md={2}>
+            <Card sx={{ bgcolor: "warning.light" }}>
+              <CardContent>
+                <Typography color="warning.contrastText" variant="body2">High Priority</Typography>
+                <Typography variant="h4" color="warning.contrastText">{crisisData.summary?.highPriorityRequests || 0}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={6} md={2}>
+            <Card sx={{ bgcolor: crisisData.summary?.criticalShortages?.length > 0 ? "error.main" : "success.main" }}>
+              <CardContent>
+                <Typography sx={{ color: "white" }} variant="body2">Critical Shortages</Typography>
+                <Typography variant="h4" sx={{ color: "white" }}>{crisisData.summary?.criticalShortages?.length || 0}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+
+        {/* Critical Shortages Alert */}
+        {crisisData.summary?.criticalShortages?.length > 0 && (
+          <Alert severity="error" sx={{ mb: 3 }} icon={<WarningIcon />}>
+            <Typography variant="subtitle2">Critical Resource Shortages Detected!</Typography>
+            <Typography variant="body2">
+              The following resources have less than 50% coverage: {" "}
+              <strong>{crisisData.summary.criticalShortages.map(formatResourceType).join(", ")}</strong>
+            </Typography>
+          </Alert>
+        )}
+
+        {/* Needs vs Offers Heatmap */}
+        <Paper sx={{ p: 3, mb: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            <BarChartIcon sx={{ mr: 1, verticalAlign: "middle" }} />
+            Needs vs Offers by Category
+          </Typography>
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell><strong>Resource Type</strong></TableCell>
+                  <TableCell align="center"><strong>Total Needs</strong></TableCell>
+                  <TableCell align="center"><strong>Unassigned</strong></TableCell>
+                  <TableCell align="center"><strong>Assigned</strong></TableCell>
+                  <TableCell align="center"><strong>NGO Capacity</strong></TableCell>
+                  <TableCell align="center"><strong>Unmet Demand</strong></TableCell>
+                  <TableCell align="center"><strong>Coverage</strong></TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {crisisData.resourceTypes?.map((type) => {
+                  const needs = crisisData.needsVsOffers?.needs?.[type] || 0;
+                  const offers = crisisData.needsVsOffers?.offers?.[type] || 0;
+                  const unassigned = crisisData.needsVsOffers?.unassignedNeeds?.[type] || 0;
+                  const assigned = crisisData.needsVsOffers?.assignedNeeds?.[type] || 0;
+                  const unmet = crisisData.unmetDemand?.[type] || 0;
+                  const coverage = crisisData.demandCoverage?.[type] || 0;
+
+                  return (
+                    <TableRow key={type} sx={{ bgcolor: getHeatmapColor(needs, maxNeed) }}>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight="medium">
+                          {formatResourceType(type)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip label={needs} size="small" color="primary" variant="outlined" />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip label={unassigned} size="small" color="warning" variant={unassigned > 0 ? "filled" : "outlined"} />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip label={assigned} size="small" color="success" variant="outlined" />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip label={offers} size="small" color="info" variant="outlined" />
+                      </TableCell>
+                      <TableCell align="center">
+                        {unmet > 0 ? (
+                          <Chip label={unmet} size="small" color="error" icon={<ErrorIcon />} />
+                        ) : (
+                          <Chip label="0" size="small" color="success" icon={<CompletedIcon />} />
+                        )}
+                      </TableCell>
+                      <TableCell align="center">
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                          <LinearProgress
+                            variant="determinate"
+                            value={Math.min(coverage, 100)}
+                            color={getCoverageColor(coverage)}
+                            sx={{ width: 60, height: 8, borderRadius: 4 }}
+                          />
+                          <Typography variant="body2" color={`${getCoverageColor(coverage)}.main`}>
+                            {coverage.toFixed(0)}%
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+
+        {/* Predicted Shortfalls */}
+        <Paper sx={{ p: 3, mb: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            <TrendingDownIcon sx={{ mr: 1, verticalAlign: "middle", color: "error.main" }} />
+            Predicted Shortfalls (Based on Current Demand Rate)
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Projections based on the last 24 hours of incoming requests
+          </Typography>
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell><strong>Resource Type</strong></TableCell>
+                  <TableCell align="center"><strong>Current Unmet</strong></TableCell>
+                  <TableCell align="center"><strong>24 Hours</strong></TableCell>
+                  <TableCell align="center"><strong>48 Hours</strong></TableCell>
+                  <TableCell align="center"><strong>72 Hours</strong></TableCell>
+                  <TableCell align="center"><strong>Trend</strong></TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {crisisData.resourceTypes?.map((type) => {
+                  const current = crisisData.unmetDemand?.[type] || 0;
+                  const h24 = crisisData.predictedShortfalls?.["24h"]?.[type] || 0;
+                  const h48 = crisisData.predictedShortfalls?.["48h"]?.[type] || 0;
+                  const h72 = crisisData.predictedShortfalls?.["72h"]?.[type] || 0;
+                  const trend = h72 > current ? "increasing" : h72 < current ? "decreasing" : "stable";
+
+                  return (
+                    <TableRow key={type}>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight="medium">
+                          {formatResourceType(type)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip label={current} size="small" color={current > 0 ? "error" : "success"} variant="outlined" />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip 
+                          label={h24} 
+                          size="small" 
+                          color={h24 > current ? "error" : h24 > 0 ? "warning" : "success"} 
+                          variant={h24 > 0 ? "filled" : "outlined"} 
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip 
+                          label={h48} 
+                          size="small" 
+                          color={h48 > h24 ? "error" : h48 > 0 ? "warning" : "success"} 
+                          variant={h48 > 0 ? "filled" : "outlined"} 
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip 
+                          label={h72} 
+                          size="small" 
+                          color={h72 > h48 ? "error" : h72 > 0 ? "warning" : "success"} 
+                          variant={h72 > 0 ? "filled" : "outlined"} 
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        {trend === "increasing" && (
+                          <Tooltip title="Shortfall increasing">
+                            <TrendingUpIcon color="error" />
+                          </Tooltip>
+                        )}
+                        {trend === "decreasing" && (
+                          <Tooltip title="Shortfall decreasing">
+                            <TrendingDownIcon color="success" />
+                          </Tooltip>
+                        )}
+                        {trend === "stable" && (
+                          <Tooltip title="Stable">
+                            <Chip label="Stable" size="small" color="info" variant="outlined" />
+                          </Tooltip>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+
+        <Grid container spacing={3}>
+          {/* Location Heatmap */}
+          <Grid item xs={12} md={6}>
+            <Paper sx={{ p: 3, height: "100%" }}>
+              <Typography variant="h6" gutterBottom>
+                <MapIcon sx={{ mr: 1, verticalAlign: "middle" }} />
+                Demand Hotspots by Location
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Top 10 areas with highest request volume
+              </Typography>
+              {crisisData.locationHeatmap?.length > 0 ? (
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell><strong>Area</strong></TableCell>
+                        <TableCell align="center"><strong>Requests</strong></TableCell>
+                        <TableCell align="center"><strong>Priority</strong></TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {crisisData.locationHeatmap.map((location, index) => (
+                        <TableRow 
+                          key={location.area} 
+                          sx={{ 
+                            bgcolor: index === 0 ? "error.light" : index < 3 ? "warning.light" : "transparent",
+                            opacity: index === 0 ? 1 : 1 - (index * 0.05)
+                          }}
+                        >
+                          <TableCell>
+                            <Typography variant="body2" fontWeight={index < 3 ? "bold" : "normal"}>
+                              {location.area}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Chip label={location.totalRequests} size="small" color="primary" />
+                          </TableCell>
+                          <TableCell align="center">
+                            <Box sx={{ display: "flex", gap: 0.5, justifyContent: "center" }}>
+                              {location.priority?.sos > 0 && (
+                                <Chip label={`${location.priority.sos} SOS`} size="small" color="error" />
+                              )}
+                              {location.priority?.high > 0 && (
+                                <Chip label={`${location.priority.high} High`} size="small" color="warning" />
+                              )}
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              ) : (
+                <Typography color="text.secondary">No location data available</Typography>
+              )}
+            </Paper>
+          </Grid>
+
+          {/* NGO Capacity */}
+          <Grid item xs={12} md={6}>
+            <Paper sx={{ p: 3, height: "100%" }}>
+              <Typography variant="h6" gutterBottom>
+                <WarehouseIcon sx={{ mr: 1, verticalAlign: "middle" }} />
+                NGO Resource Capacity
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Organizations sorted by total resource capacity
+              </Typography>
+              {crisisData.ngoCapacity?.length > 0 ? (
+                <TableContainer sx={{ maxHeight: 300 }}>
+                  <Table size="small" stickyHeader>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell><strong>Organization</strong></TableCell>
+                        <TableCell align="center"><strong>Total Capacity</strong></TableCell>
+                        <TableCell><strong>Resources</strong></TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {crisisData.ngoCapacity.slice(0, 10).map((ngo) => (
+                        <TableRow key={ngo.name}>
+                          <TableCell>
+                            <Typography variant="body2" fontWeight="medium">
+                              {ngo.name}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {ngo.address?.substring(0, 30)}...
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Chip label={ngo.totalCapacity} size="small" color="success" />
+                          </TableCell>
+                          <TableCell>
+                            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                              {ngo.offers?.slice(0, 3).map((offer) => (
+                                <Chip
+                                  key={offer.type}
+                                  label={`${formatResourceType(offer.type)}: ${offer.quantity}`}
+                                  size="small"
+                                  variant="outlined"
+                                />
+                              ))}
+                              {ngo.offers?.length > 3 && (
+                                <Chip label={`+${ngo.offers.length - 3}`} size="small" />
+                              )}
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              ) : (
+                <Typography color="text.secondary">No NGO capacity data available</Typography>
+              )}
+            </Paper>
+          </Grid>
+        </Grid>
+
+        {/* Map Visualization */}
+        <Paper sx={{ p: 3, mt: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            <MapIcon sx={{ mr: 1, verticalAlign: "middle" }} />
+            Crisis Map - Request Hotspots & NGO Locations
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Circles indicate active requests - color shows priority (red=SOS, orange=high, yellow=medium, green=low). 
+            Circle size reflects urgency and demand. Green markers show NGO locations.
+          </Typography>
+          {(crisisData.mapData?.length > 0 || crisisData.ngoMapData?.length > 0) ? (
+            <CrisisHeatmap
+              requests={crisisData.mapData || []}
+              ngos={crisisData.ngoMapData || []}
+              height={500}
+              showNGOs={true}
+              showLegend={true}
+            />
+          ) : (
+            <Box sx={{ 
+              height: 300, 
+              display: "flex", 
+              alignItems: "center", 
+              justifyContent: "center",
+              bgcolor: "grey.100",
+              borderRadius: 1
+            }}>
+              <Typography color="text.secondary">
+                No location data available. Requests and NGOs need valid coordinates to appear on the map.
+              </Typography>
+            </Box>
+          )}
+        </Paper>
+      </Box>
+    );
+  };
+
   const ShelterManagementPanel = () => (
     <Box>
       <Box
@@ -727,14 +1190,16 @@ const Authority = () => {
       <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
         <Tabs value={activeTab} onChange={handleTabChange}>
           <Tab icon={<DashboardIcon />} label="Crisis Monitoring" />
+          <Tab icon={<BarChartIcon />} label="Crisis Load Dashboard" />
           <Tab icon={<WarehouseIcon />} label="Shelters & Resources" />
           <Tab icon={<CampaignIcon />} label="Public Advisories" />
         </Tabs>
       </Box>
 
       {activeTab === 0 && <CrisisMonitoringPanel />}
-      {activeTab === 1 && <ShelterManagementPanel />}
-      {activeTab === 2 && <AdvisoryManagementPanel />}
+      {activeTab === 1 && <CrisisLoadDashboardPanel />}
+      {activeTab === 2 && <ShelterManagementPanel />}
+      {activeTab === 3 && <AdvisoryManagementPanel />}
 
       {/* Advisory Dialog */}
       <Dialog
