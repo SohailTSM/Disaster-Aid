@@ -113,6 +113,13 @@ export const organizationService = {
     });
     return response.data;
   },
+  // Get geospatially matched NGOs for a request
+  getMatchedNGOs: async (requestId, maxDistance = 100, limit = 20) => {
+    const response = await api.get(`/organizations/matched/${requestId}`, {
+      params: { maxDistance, limit },
+    });
+    return response.data;
+  },
 };
 
 export const assignmentService = {

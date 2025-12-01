@@ -2,6 +2,7 @@ const asyncHandler = require("express-async-handler");
 const Organization = require("../models/organization.model");
 const Request = require("../models/request.model");
 const User = require("../models/user.model");
+const GeospatialService = require("../services/geospatial.service");
 // GET /api/organizations/pending (admin)
 const listPendingOrganizations = asyncHandler(async (req, res) => {
   const orgs = await Organization.find({ approved: false }).sort({
@@ -219,6 +220,65 @@ const getMyOrganization = asyncHandler(async (req, res) => {
   res.json({ organization: org });
 });
 
+// GET /api/organizations/matched/:requestId (dispatcher) - Get geospatially matched NGOs for a request
+const getMatchedNGOsForRequest = asyncHandler(async (req, res) => {
+  const requestId = req.params.requestId;
+  const { maxDistance, limit } = req.query;
+
+  const request = await Request.findById(requestId);
+  if (!request) {
+    res.status(404);
+    throw new Error("Request not found");
+  }
+
+  // Check if request has valid location
+  if (!request.location || !request.location.coordinates || request.location.coordinates.length !== 2) {
+    // Fall back to returning all eligible NGOs without distance sorting
+    const Organization = require("../models/organization.model");
+    const allNGOs = await Organization.find({
+      $or: [
+        { approved: true },
+        { verificationStatus: "verified" }
+      ],
+      suspended: { $ne: true },
+    }).limit(parseInt(limit) || 20);
+
+    const ngosWithDefaults = allNGOs.map(ngo => ({
+      ...ngo.toObject(),
+      distance: null,
+      distanceText: "Distance unknown",
+      matchedNeeds: [],
+      availableResources: ngo.offers || [],
+      matchScore: 0,
+      distanceScore: 0,
+      combinedScore: 0,
+      canPartiallyFulfill: false,
+      canFullyFulfill: false,
+    }));
+
+    return res.json({ 
+      requestId: request._id,
+      requestLocation: request.location,
+      totalMatches: ngosWithDefaults.length,
+      organizations: ngosWithDefaults,
+      warning: "Request has no valid location coordinates. Showing all eligible NGOs."
+    });
+  }
+
+  const options = {};
+  if (maxDistance) options.maxDistance = parseInt(maxDistance);
+  if (limit) options.limit = parseInt(limit);
+
+  const matchedNGOs = await GeospatialService.findMatchingNGOs(request, options);
+
+  res.json({ 
+    requestId: request._id,
+    requestLocation: request.location,
+    totalMatches: matchedNGOs.length,
+    organizations: matchedNGOs 
+  });
+});
+
 module.exports = {
   createOrganization,
   listOrganizations,
@@ -232,4 +292,5 @@ module.exports = {
   unsuspendOrganization,
   updateMyResources,
   getMyOrganization,
+  getMatchedNGOsForRequest,
 };

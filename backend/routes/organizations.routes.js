@@ -13,6 +13,7 @@ const {
   unsuspendOrganization,
   updateMyResources,
   getMyOrganization,
+  getMatchedNGOsForRequest,
 } = require("../controllers/organization.controller");
 const auth = require("../middleware/auth.middleware");
 const allowedRoles = require("../middleware/roles.middleware");
@@ -24,6 +25,14 @@ router.put(
   auth,
   allowedRoles("ngo_member"),
   updateMyResources
+);
+
+// Dispatcher route for geospatial matching (must come before /:id routes)
+router.get(
+  "/matched/:requestId",
+  auth,
+  allowedRoles("dispatcher", "admin"),
+  getMatchedNGOsForRequest
 );
 
 // Admin routes for org approval and data management

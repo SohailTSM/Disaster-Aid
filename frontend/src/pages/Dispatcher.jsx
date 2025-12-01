@@ -109,6 +109,7 @@ export default function Dispatcher() {
   const [allRequests, setAllRequests] = useState([]);
   const [filteredRequests, setFilteredRequests] = useState([]);
   const [ngos, setNgos] = useState([]);
+  const [matchedNGOs, setMatchedNGOs] = useState([]); // For geospatially matched NGOs
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -447,10 +448,23 @@ export default function Dispatcher() {
   };
 
   // Handle assigning an NGO to a specific need
-  const handleAssignNeedToNGO = (need, index) => {
+  const handleAssignNeedToNGO = async (need, index) => {
     setSelectedNeedForAssignment({ ...need, index });
     setSelectedNgoForNeed("");
     setAssignNeedDialogOpen(true);
+
+    // Fetch geospatially matched NGOs for this request
+    if (selectedRequest) {
+      try {
+        const matchedData = await organizationService.getMatchedNGOs(
+          selectedRequest._id
+        );
+        setMatchedNGOs(matchedData.organizations || []);
+      } catch (error) {
+        console.error("Error fetching matched NGOs:", error);
+        toast.error("Failed to load nearby NGOs");
+      }
+    }
   };
 
   const confirmAssignNeedToNGO = async () => {
@@ -1316,45 +1330,108 @@ export default function Dispatcher() {
                 value={selectedNgoForNeed}
                 label="Select NGO"
                 onChange={(e) => setSelectedNgoForNeed(e.target.value)}>
-                {ngos
-                  .filter(
-                    (ngo) =>
+                {(matchedNGOs.length > 0 ? matchedNGOs : ngos)
+                  .filter((ngo) => {
+                    // For matched NGOs from geospatial service, they're already pre-filtered
+                    // Just check if they offer the needed resource
+                    const resources = ngo.offers || ngo.availableResources || [];
+                    const hasResource = resources.some(
+                      (offer) => offer.type === selectedNeedForAssignment?.type
+                    );
+                    
+                    // If from geospatial service (has distanceText), trust the backend filtering
+                    if (ngo.distanceText) {
+                      return hasResource;
+                    }
+                    
+                    // For regular NGOs list, apply full filter
+                    return (
                       (ngo.approved || ngo.verificationStatus === "verified") &&
                       !ngo.suspended &&
-                      ngo.offers?.some(
-                        (offer) =>
-                          offer.type === selectedNeedForAssignment?.type
-                      )
-                  )
-                  .map((ngo) => (
-                    <MenuItem key={ngo._id} value={ngo._id}>
-                      <Box>
-                        <Typography variant="body2">{ngo.name}</Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {ngo.offers
-                            ?.filter(
-                              (offer) =>
-                                offer.type === selectedNeedForAssignment?.type
-                            )
-                            .map((offer) => `${offer.quantity} available`)
-                            .join(", ")}
-                        </Typography>
-                      </Box>
-                    </MenuItem>
-                  ))}
+                      hasResource
+                    );
+                  })
+                  .map((ngo) => {
+                    const isMatched = matchedNGOs.some(
+                      (m) => m._id === ngo._id
+                    );
+                    const matchedNGO = matchedNGOs.find(
+                      (m) => m._id === ngo._id
+                    );
+                    const resources = ngo.offers || ngo.availableResources || [];
+                    const canFulfill = matchedNGO?.canFullyFulfill;
+
+                    return (
+                      <MenuItem key={ngo._id} value={ngo._id}>
+                        <Box sx={{ width: "100%" }}>
+                          <Box
+                            display="flex"
+                            justifyContent="space-between"
+                            alignItems="center">
+                            <Typography variant="body2">{ngo.name}</Typography>
+                            {isMatched && (
+                              <Chip
+                                label={ngo.distanceText}
+                                size="small"
+                                color="primary"
+                                variant="outlined"
+                                sx={{ ml: 1 }}
+                              />
+                            )}
+                          </Box>
+                          <Box
+                            display="flex"
+                            justifyContent="space-between"
+                            alignItems="center">
+                            <Typography
+                              variant="caption"
+                              color="text.secondary">
+                              {resources
+                                .filter(
+                                  (offer) =>
+                                    offer.type ===
+                                    selectedNeedForAssignment?.type
+                                )
+                                .map((offer) => `${offer.quantity} available`)
+                                .join(", ")}
+                            </Typography>
+                            {canFulfill && (
+                              <CheckCircleIcon
+                                fontSize="small"
+                                color="success"
+                                sx={{ ml: 1 }}
+                              />
+                            )}
+                          </Box>
+                        </Box>
+                      </MenuItem>
+                    );
+                  })}
               </Select>
             </FormControl>
 
-            {ngos.filter(
-              (ngo) =>
-                (ngo.approved || ngo.verificationStatus === "verified") &&
-                !ngo.suspended &&
-                ngo.offers?.some(
-                  (offer) => offer.type === selectedNeedForAssignment?.type
-                )
-            ).length === 0 && (
-              <Alert severity="info" sx={{ mt: 2 }}>
-                No NGOs available for {selectedNeedForAssignment?.type}
+            {matchedNGOs.length === 0 &&
+              ngos.filter(
+                (ngo) =>
+                  (ngo.approved || ngo.verificationStatus === "verified") &&
+                  !ngo.suspended &&
+                  ngo.offers?.some(
+                    (offer) => offer.type === selectedNeedForAssignment?.type
+                  )
+              ).length === 0 && (
+                <Alert severity="info" sx={{ mt: 2 }}>
+                  No NGOs available for {selectedNeedForAssignment?.type}
+                </Alert>
+              )}
+
+            {matchedNGOs.length > 0 && (
+              <Alert severity="success" sx={{ mt: 2 }}>
+                Showing {matchedNGOs.filter((ngo) => {
+                  const resources = ngo.offers || ngo.availableResources || [];
+                  return resources.some(
+                    (offer) => offer.type === selectedNeedForAssignment?.type
+                  );
+                }).length} nearby NGOs sorted by distance and availability
               </Alert>
             )}
           </Box>
