@@ -187,10 +187,49 @@ const refreshToken = asyncHandler(async (req, res) => {
   }
 });
 
+// PUT /api/auth/change-password
+const changePassword = asyncHandler(async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+  
+  if (!oldPassword || !newPassword) {
+    res.status(400);
+    throw new Error("Please provide old and new password");
+  }
+
+  if (newPassword.length < 6) {
+    res.status(400);
+    throw new Error("New password must be at least 6 characters");
+  }
+
+  const user = await User.findById(req.user._id);
+  if (!user) {
+    res.status(404);
+    throw new Error("User not found");
+  }
+
+  // Verify old password
+  const match = await bcrypt.compare(oldPassword, user.passwordHash);
+  if (!match) {
+    res.status(401);
+    throw new Error("Current password is incorrect");
+  }
+
+  // Hash new password
+  const salt = await bcrypt.genSalt(10);
+  const passwordHash = await bcrypt.hash(newPassword, salt);
+
+  // Update password
+  user.passwordHash = passwordHash;
+  await user.save();
+
+  res.json({ message: "Password changed successfully" });
+});
+
 module.exports = {
   register,
   login,
   logout,
   me,
   refreshToken,
+  changePassword,
 };

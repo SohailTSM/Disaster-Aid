@@ -122,9 +122,37 @@ const Authority = () => {
   const [deliveryProofDialogOpen, setDeliveryProofDialogOpen] = useState(false);
   const [selectedDeliveryProof, setSelectedDeliveryProof] = useState(null);
 
+  // Priority change dialog
+  const [priorityDialogOpen, setPriorityDialogOpen] = useState(false);
+  const [newPriority, setNewPriority] = useState("");
+
   // Crisis Load Dashboard state
   const [crisisData, setCrisisData] = useState(null);
   const [crisisLoading, setCrisisLoading] = useState(false);
+
+  // Priority levels constant
+  const PRIORITY_LEVELS = {
+    LOW: "low",
+    MEDIUM: "medium",
+    HIGH: "high",
+    SOS: "sos",
+  };
+
+  // Get color for priority levels
+  const getPriorityColor = (priority) => {
+    switch (priority) {
+      case PRIORITY_LEVELS.SOS:
+        return "error";
+      case PRIORITY_LEVELS.HIGH:
+        return "warning";
+      case PRIORITY_LEVELS.MEDIUM:
+        return "info";
+      case PRIORITY_LEVELS.LOW:
+        return "success";
+      default:
+        return "primary";
+    }
+  };
 
   useEffect(() => {
     fetchRequests();
@@ -193,6 +221,45 @@ const Authority = () => {
   const handleCloseRequestDialog = () => {
     setRequestDialog(false);
     setSelectedRequest(null);
+  };
+
+  // Priority change handlers
+  const handleChangePriority = () => {
+    if (selectedRequest) {
+      setNewPriority(selectedRequest.priority || "low");
+      setPriorityDialogOpen(true);
+    }
+  };
+
+  const confirmChangePriority = async () => {
+    if (!selectedRequest || !newPriority) return;
+
+    try {
+      await requestService.updatePriority(selectedRequest._id, newPriority);
+      
+      // Update the selected request
+      const updatedRequest = {
+        ...selectedRequest,
+        priority: newPriority,
+        isSoS: newPriority === PRIORITY_LEVELS.SOS,
+      };
+      setSelectedRequest(updatedRequest);
+
+      // Update in requests list
+      setRequests((prevRequests) =>
+        prevRequests.map((req) =>
+          req._id === selectedRequest._id
+            ? { ...req, priority: newPriority, isSoS: newPriority === PRIORITY_LEVELS.SOS }
+            : req
+        )
+      );
+
+      toast.success(`Priority updated to ${newPriority.toUpperCase()}`);
+      setPriorityDialogOpen(false);
+    } catch (error) {
+      console.error("Error updating priority:", error);
+      toast.error("Failed to update priority");
+    }
   };
 
   const fetchAdvisories = async () => {
@@ -1680,6 +1747,26 @@ const Authority = () => {
                 </Grid>
                 <Grid item xs={12} md={6}>
                   <Typography variant="body2" color="text.secondary">
+                    Priority
+                  </Typography>
+                  <Box display="flex" gap={1} alignItems="center" sx={{ mt: 0.5 }}>
+                    <Chip
+                      label={`${(selectedRequest.priority || "low").toUpperCase()}`}
+                      color={getPriorityColor(selectedRequest.priority)}
+                      size="small"
+                    />
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={handleChangePriority}
+                      startIcon={<EditIcon />}
+                      disabled={selectedRequest.status === "Closed"}>
+                      Change
+                    </Button>
+                  </Box>
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="body2" color="text.secondary">
                     Created At
                   </Typography>
                   <Typography variant="body1" gutterBottom>
@@ -1983,6 +2070,46 @@ const Authority = () => {
         <DialogActions>
           <Button onClick={() => setDeliveryProofDialogOpen(false)}>
             Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Priority Change Dialog */}
+      <Dialog
+        open={priorityDialogOpen}
+        onClose={() => setPriorityDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth>
+        <DialogTitle>Change Request Priority</DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="body2" color="text.secondary" paragraph>
+              Select the new priority level for this request:
+            </Typography>
+            <FormControl component="fieldset" fullWidth>
+              <Stack spacing={1}>
+                {Object.values(PRIORITY_LEVELS).map((priority) => (
+                  <Button
+                    key={priority}
+                    variant={newPriority === priority ? "contained" : "outlined"}
+                    color={getPriorityColor(priority)}
+                    onClick={() => setNewPriority(priority)}
+                    fullWidth>
+                    {priority.toUpperCase()}
+                  </Button>
+                ))}
+              </Stack>
+            </FormControl>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPriorityDialogOpen(false)}>Cancel</Button>
+          <Button
+            onClick={confirmChangePriority}
+            variant="contained"
+            color="primary"
+            disabled={!newPriority || newPriority === selectedRequest?.priority}>
+            Confirm
           </Button>
         </DialogActions>
       </Dialog>

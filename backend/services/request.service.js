@@ -12,6 +12,64 @@ const validateLocation = (location) => {
   }
 };
 
+/**
+ * Auto-triage: Calculate priority based on multiple factors
+ * @param {object} data - Request data
+ * @returns {string} - Priority level (low, medium, high, sos)
+ */
+const calculatePriority = (data) => {
+  const priorities = ["low", "medium", "high", "sos"];
+  let calculatedPriority = "low";
+
+  // Rule 1: Total number of victims
+  const totalVictims = 
+    (data.beneficiaries_adults || 0) + 
+    (data.beneficiaries_children || 0) + 
+    (data.beneficiaries_elderly || 0);
+
+  if (totalVictims > 20) {
+    calculatedPriority = "sos";
+  } else if (totalVictims > 10) {
+    calculatedPriority = "high";
+  } else if (totalVictims > 5) {
+    calculatedPriority = "medium";
+  }
+
+  // Rule 2: Vulnerable populations (children + elderly)
+  const vulnerableCount = 
+    (data.beneficiaries_children || 0) + 
+    (data.beneficiaries_elderly || 0);
+
+  let vulnerablePriority = "low";
+  if (vulnerableCount > 10) {
+    vulnerablePriority = "sos";
+  } else if (vulnerableCount > 5) {
+    vulnerablePriority = "high";
+  } else if (vulnerableCount > 3) {
+    vulnerablePriority = "medium";
+  }
+
+  // Select highest priority between total victims and vulnerable count
+  if (priorities.indexOf(vulnerablePriority) > priorities.indexOf(calculatedPriority)) {
+    calculatedPriority = vulnerablePriority;
+  }
+
+  // Rule 3: Emergency keywords in special needs or address
+  const text = 
+    (data.specialNeeds || "");
+  
+  const emergencyKeywords = ["trapped", "drowned", "emergency", "dead", "sos", "trap", "drown", "crushed", "urgent", "immediately", "help"];
+  const hasEmergencyKeyword = emergencyKeywords.some(keyword => 
+    text.toLowerCase().includes(keyword.toLowerCase())
+  );
+
+  if (hasEmergencyKeyword) {
+    calculatedPriority = "sos";
+  }
+
+  return calculatedPriority;
+};
+
 const createRequest = async (data) => {
   // minimal validation
   if (!data.contactName || !data.contactPhone || !data.location) {
@@ -22,19 +80,9 @@ const createRequest = async (data) => {
 
   validateLocation(data.location);
 
-  // Auto-triage: flag SOS if priority 'sos' or keyword present
-  const text = (data.specialNeeds || "") + " " + (data.addressText || "");
-  const sosKeywords = [
-    "trapped",
-    "injured",
-    "help",
-    "sos",
-    "immediately",
-    "urgent",
-  ];
-  const isSoS =
-    data.priority === "sos" ||
-    sosKeywords.some((k) => text.toLowerCase().includes(k));
+  // Auto-triage: Calculate priority based on multiple factors
+  const calculatedPriority = calculatePriority(data);
+  const isSoS = calculatedPriority === "sos";
 
   // Generate auto-increment 7-digit numeric requestId
   let counter = await Counter.findByIdAndUpdate(
@@ -48,8 +96,8 @@ const createRequest = async (data) => {
     ...data,
     requestId,
     isSoS,
-    priority: data.priority || (isSoS ? "sos" : data.priority || "low"),
-    status: "New",
+    priority: calculatedPriority,
+    status: "Triaged", // Auto-set status to Triaged after auto-triaging
   });
 
   await reqDoc.save();

@@ -219,6 +219,37 @@ const deleteNeed = asyncHandler(async (req, res) => {
   res.json({ message: "Need deleted successfully", request: reqDoc });
 });
 
+// PUT /api/requests/:id/priority - Update request priority (dispatcher/authority)
+const updatePriority = asyncHandler(async (req, res) => {
+  const { priority } = req.body;
+
+  // Validate priority value
+  const validPriorities = ["low", "medium", "high", "sos"];
+  if (!priority || !validPriorities.includes(priority)) {
+    res.status(400);
+    throw new Error(
+      "Invalid priority. Must be one of: low, medium, high, sos"
+    );
+  }
+
+  const reqDoc = await Request.findById(req.params.id);
+  if (!reqDoc) {
+    res.status(404);
+    throw new Error("Request not found");
+  }
+
+  const oldPriority = reqDoc.priority;
+  reqDoc.priority = priority;
+  reqDoc.isSoS = priority === "sos";
+
+  await reqDoc.save();
+
+  res.json({
+    message: `Priority updated from ${oldPriority} to ${priority}`,
+    request: reqDoc,
+  });
+});
+
 module.exports = {
   createRequest,
   listRequests,
@@ -227,4 +258,5 @@ module.exports = {
   getRequestByRequestId,
   updateNeed,
   deleteNeed,
+  updatePriority,
 };

@@ -8,6 +8,7 @@ const {
   getRequestByRequestId,
   updateNeed,
   deleteNeed,
+  updatePriority,
 } = require("../controllers/request.controller");
 const auth = require("../middleware/auth.middleware");
 const allowedRoles = require("../middleware/roles.middleware");
@@ -49,6 +50,14 @@ router.delete(
   auth,
   allowedRoles("dispatcher", "admin"),
   deleteNeed
+);
+
+// Priority update
+router.put(
+  "/:id/priority",
+  auth,
+  allowedRoles("dispatcher", "authority", "admin"),
+  updatePriority
 );
 
 module.exports = router;

@@ -30,6 +30,10 @@ export const authService = {
     const response = await api.get("/auth/me");
     return response.data;
   },
+  changePassword: async (oldPassword, newPassword) => {
+    const response = await api.put("/auth/change-password", { oldPassword, newPassword });
+    return response.data;
+  },
 };
 
 export const requestService = {
@@ -73,6 +77,10 @@ export const requestService = {
     const response = await api.delete(
       `/requests/${requestId}/needs/${needIndex}`
     );
+    return response.data;
+  },
+  updatePriority: async (id, priority) => {
+    const response = await api.put(`/requests/${id}/priority`, { priority });
     return response.data;
   },
 };
