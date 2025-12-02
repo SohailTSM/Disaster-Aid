@@ -479,10 +479,9 @@ export default function RequestForm() {
           <Button
             variant="contained"
             onClick={() => {
-              setSubmitted(false);
-              setSubmittedRequestId(null);
+              window.location.href = "/";
             }}>
-            Submit Another Request
+            Go to Home
           </Button>
         </Paper>
       </Container>

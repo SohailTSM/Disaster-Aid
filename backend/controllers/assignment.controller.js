@@ -3,6 +3,10 @@ const Assignment = require("../models/assignment.model");
 const AssignmentService = require("../services/assignment.service");
 const Organization = require("../models/organization.model");
 const { uploadFile, getSignedDownloadUrl } = require("../services/s3.service");
+const {
+  notifyVictim,
+  generateNotificationMessage,
+} = require("../services/messaging.service");
 
 // POST /api/assignments (dispatcher)
 const createAssignment = asyncHandler(async (req, res) => {
@@ -21,6 +25,24 @@ const createAssignment = asyncHandler(async (req, res) => {
     assignedNeeds,
     notes
   );
+
+  // Send notification to victim about assignment
+  try {
+    const Request = require("../models/request.model");
+    const request = await Request.findById(requestId);
+    const org = await Organization.findById(organizationId);
+
+    if (request && org) {
+      const message = generateNotificationMessage(request, "assigned", {
+        organizationName: org.name,
+        needTypes: assignedNeeds,
+      });
+      await notifyVictim(request, message);
+    }
+  } catch (error) {
+    console.error("Failed to send assignment notification:", error);
+  }
+
   res.status(201).json({ assignment });
 });
 
@@ -117,6 +139,29 @@ const acceptAssignment = asyncHandler(async (req, res) => {
   }
 
   await assignment.save();
+
+  // Notify victim that organization accepted the assignment
+  try {
+    const Request = require("../models/request.model");
+    const request = await Request.findById(
+      assignment.requestId._id || assignment.requestId
+    );
+    const org = await Organization.findById(assignment.organizationId);
+
+    if (request && org) {
+      const message = generateNotificationMessage(
+        request,
+        "assignment_accepted",
+        {
+          organizationName: org.name,
+        }
+      );
+      await notifyVictim(request, message);
+    }
+  } catch (error) {
+    console.error("Failed to send acceptance notification:", error);
+  }
+
   res.json({ message: "Assignment accepted", assignment });
 });
 
@@ -179,6 +224,19 @@ const declineAssignment = asyncHandler(async (req, res) => {
       }
     });
     await org.save();
+  }
+
+  // Notify victim that assignment was declined (being reassigned)
+  try {
+    if (request) {
+      const message = generateNotificationMessage(
+        request,
+        "assignment_declined"
+      );
+      await notifyVictim(request, message);
+    }
+  } catch (error) {
+    console.error("Failed to send decline notification:", error);
   }
 
   res.json({ message: "Assignment declined", assignment });
@@ -324,6 +382,39 @@ const updateAssignmentStatus = asyncHandler(async (req, res) => {
       }
 
       await request.save();
+
+      // Notify victim based on status change
+      try {
+        let updateType = null;
+        let notificationDetails = {};
+
+        if (status === "In-Transit") {
+          updateType = "delivery_started";
+          // Include delivery details in the notification
+          if (assignment.deliveryDetails) {
+            notificationDetails.deliveryDetails = assignment.deliveryDetails;
+          }
+        } else if (status === "Completed") {
+          // Check if all needs are completed
+          const allCompleted = request.needs.every(
+            (n) =>
+              n.assignmentStatus === "completed" ||
+              n.assignmentStatus === "unassigned"
+          );
+          updateType = allCompleted ? "completed" : "in_progress";
+        }
+
+        if (updateType) {
+          const message = generateNotificationMessage(
+            request,
+            updateType,
+            notificationDetails
+          );
+          await notifyVictim(request, message);
+        }
+      } catch (error) {
+        console.error("Failed to send status update notification:", error);
+      }
     }
   }
 

@@ -88,6 +88,13 @@ const NGO = () => {
     driverPhone: "",
     additionalNotes: "",
   });
+
+  // Helper to get default ETA (2 hours from now)
+  const getDefaultETA = () => {
+    const now = new Date();
+    now.setHours(now.getHours() + 2);
+    return now.toISOString().slice(0, 16); // Format for datetime-local input
+  };
   const [completionImageFile, setCompletionImageFile] = useState(null);
   const [completionImagePreview, setCompletionImagePreview] = useState("");
   const [completionNotes, setCompletionNotes] = useState("");
@@ -168,7 +175,7 @@ const NGO = () => {
     setSelectedAssignment(assignment);
     setNewStatus(status);
     setDeliveryDetails({
-      estimatedDeliveryTime: "",
+      estimatedDeliveryTime: status === "In-Transit" ? getDefaultETA() : "",
       vehicleNumber: "",
       driverName: "",
       driverPhone: "",
@@ -659,6 +666,7 @@ const NGO = () => {
                 <Grid item xs={12} sm={6}>
                   <TextField
                     fullWidth
+                    required
                     label="Estimated Delivery Time"
                     type="datetime-local"
                     value={deliveryDetails.estimatedDeliveryTime}
@@ -669,6 +677,7 @@ const NGO = () => {
                       })
                     }
                     InputLabelProps={{ shrink: true }}
+                    helperText="When will you reach the victim's location?"
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
@@ -791,7 +800,9 @@ const NGO = () => {
             onClick={handleStatusSubmit}
             variant="contained"
             disabled={
-              newStatus === "In-Transit" && !deliveryDetails.vehicleNumber
+              newStatus === "In-Transit" &&
+              (!deliveryDetails.vehicleNumber ||
+                !deliveryDetails.estimatedDeliveryTime)
             }>
             Update Status
           </Button>

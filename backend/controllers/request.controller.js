@@ -5,6 +5,10 @@ const {
   uploadMultipleFiles,
   getSignedDownloadUrl,
 } = require("../services/s3.service");
+const {
+  notifyVictim,
+  generateNotificationMessage,
+} = require("../services/messaging.service");
 
 // POST /api/requests (public)
 const createRequest = asyncHandler(async (req, res) => {
@@ -26,6 +30,16 @@ const createRequest = asyncHandler(async (req, res) => {
   requestData.evidence = evidenceData;
 
   const created = await requestService.createRequest(requestData);
+
+  // Send notification to victim
+  try {
+    const message = generateNotificationMessage(created, "created");
+    await notifyVictim(created, message);
+  } catch (error) {
+    console.error("Failed to send notification:", error);
+    // Don't fail the request creation if notification fails
+  }
+
   res.status(201).json({
     request: created,
     requestId: created.requestId,
@@ -81,10 +95,28 @@ const updateRequest = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Request not found");
   }
+
+  const oldStatus = reqDoc.status;
+
   if (status) reqDoc.status = status;
   if (notes) reqDoc.notes = notes;
   if (needs) reqDoc.needs = needs;
   await reqDoc.save();
+
+  // Send notification if status changed
+  if (status && status !== oldStatus) {
+    try {
+      let updateType = "in_progress";
+      if (status === "Triaged") updateType = "triaged";
+      else if (status === "Closed") updateType = "closed";
+
+      const message = generateNotificationMessage(reqDoc, updateType);
+      await notifyVictim(reqDoc, message);
+    } catch (error) {
+      console.error("Failed to send notification:", error);
+    }
+  }
+
   res.json({ message: "Request updated", request: reqDoc });
 });
 
