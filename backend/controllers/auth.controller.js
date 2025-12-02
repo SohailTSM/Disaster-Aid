@@ -190,7 +190,7 @@ const refreshToken = asyncHandler(async (req, res) => {
 // PUT /api/auth/change-password
 const changePassword = asyncHandler(async (req, res) => {
   const { oldPassword, newPassword } = req.body;
-  
+
   if (!oldPassword || !newPassword) {
     res.status(400);
     throw new Error("Please provide old and new password");

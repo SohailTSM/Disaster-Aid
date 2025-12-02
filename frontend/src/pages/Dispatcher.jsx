@@ -850,10 +850,17 @@ export default function Dispatcher() {
                     #{selectedRequest.requestId || "N/A"} -{" "}
                     {selectedRequest.addressText || "No address"}
                   </Typography>
-                  <Box display="flex" flexWrap="wrap" gap={1} mb={2} alignItems="center">
+                  <Box
+                    display="flex"
+                    flexWrap="wrap"
+                    gap={1}
+                    mb={2}
+                    alignItems="center">
                     {getStatusChip(selectedRequest.status)}
                     <Chip
-                      label={`Priority: ${(selectedRequest.priority || "low").toUpperCase()}`}
+                      label={`Priority: ${(
+                        selectedRequest.priority || "low"
+                      ).toUpperCase()}`}
                       color={getPriorityColor(selectedRequest.priority)}
                       variant="outlined"
                       size="small"
@@ -863,7 +870,9 @@ export default function Dispatcher() {
                       variant="outlined"
                       onClick={handleChangePriority}
                       startIcon={<EditIcon />}
-                      disabled={selectedRequest.status === REQUEST_STATUS.CLOSED}>
+                      disabled={
+                        selectedRequest.status === REQUEST_STATUS.CLOSED
+                      }>
                       Change Priority
                     </Button>
                   </Box>
@@ -1758,7 +1767,9 @@ export default function Dispatcher() {
                 {Object.values(PRIORITY_LEVELS).map((priority) => (
                   <Button
                     key={priority}
-                    variant={newPriority === priority ? "contained" : "outlined"}
+                    variant={
+                      newPriority === priority ? "contained" : "outlined"
+                    }
                     color={getPriorityColor(priority)}
                     onClick={() => setNewPriority(priority)}
                     fullWidth>
@@ -1775,7 +1786,9 @@ export default function Dispatcher() {
             onClick={confirmChangePriority}
             variant="contained"
             color="primary"
-            disabled={!newPriority || newPriority === selectedRequest?.priority}>
+            disabled={
+              !newPriority || newPriority === selectedRequest?.priority
+            }>
             Confirm
           </Button>
         </DialogActions>

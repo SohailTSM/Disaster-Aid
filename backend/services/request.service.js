@@ -22,9 +22,9 @@ const calculatePriority = (data) => {
   let calculatedPriority = "low";
 
   // Rule 1: Total number of victims
-  const totalVictims = 
-    (data.beneficiaries_adults || 0) + 
-    (data.beneficiaries_children || 0) + 
+  const totalVictims =
+    (data.beneficiaries_adults || 0) +
+    (data.beneficiaries_children || 0) +
     (data.beneficiaries_elderly || 0);
 
   if (totalVictims > 20) {
@@ -36,9 +36,8 @@ const calculatePriority = (data) => {
   }
 
   // Rule 2: Vulnerable populations (children + elderly)
-  const vulnerableCount = 
-    (data.beneficiaries_children || 0) + 
-    (data.beneficiaries_elderly || 0);
+  const vulnerableCount =
+    (data.beneficiaries_children || 0) + (data.beneficiaries_elderly || 0);
 
   let vulnerablePriority = "low";
   if (vulnerableCount > 10) {
@@ -50,16 +49,30 @@ const calculatePriority = (data) => {
   }
 
   // Select highest priority between total victims and vulnerable count
-  if (priorities.indexOf(vulnerablePriority) > priorities.indexOf(calculatedPriority)) {
+  if (
+    priorities.indexOf(vulnerablePriority) >
+    priorities.indexOf(calculatedPriority)
+  ) {
     calculatedPriority = vulnerablePriority;
   }
 
   // Rule 3: Emergency keywords in special needs or address
-  const text = 
-    (data.specialNeeds || "");
-  
-  const emergencyKeywords = ["trapped", "drowned", "emergency", "dead", "sos", "trap", "drown", "crushed", "urgent", "immediately", "help"];
-  const hasEmergencyKeyword = emergencyKeywords.some(keyword => 
+  const text = data.specialNeeds || "";
+
+  const emergencyKeywords = [
+    "trapped",
+    "drowned",
+    "emergency",
+    "dead",
+    "sos",
+    "trap",
+    "drown",
+    "crushed",
+    "urgent",
+    "immediately",
+    "help",
+  ];
+  const hasEmergencyKeyword = emergencyKeywords.some((keyword) =>
     text.toLowerCase().includes(keyword.toLowerCase())
   );
 

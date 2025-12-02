@@ -236,7 +236,7 @@ const Authority = () => {
 
     try {
       await requestService.updatePriority(selectedRequest._id, newPriority);
-      
+
       // Update the selected request
       const updatedRequest = {
         ...selectedRequest,
@@ -249,7 +249,11 @@ const Authority = () => {
       setRequests((prevRequests) =>
         prevRequests.map((req) =>
           req._id === selectedRequest._id
-            ? { ...req, priority: newPriority, isSoS: newPriority === PRIORITY_LEVELS.SOS }
+            ? {
+                ...req,
+                priority: newPriority,
+                isSoS: newPriority === PRIORITY_LEVELS.SOS,
+              }
             : req
         )
       );
@@ -1749,9 +1753,15 @@ const Authority = () => {
                   <Typography variant="body2" color="text.secondary">
                     Priority
                   </Typography>
-                  <Box display="flex" gap={1} alignItems="center" sx={{ mt: 0.5 }}>
+                  <Box
+                    display="flex"
+                    gap={1}
+                    alignItems="center"
+                    sx={{ mt: 0.5 }}>
                     <Chip
-                      label={`${(selectedRequest.priority || "low").toUpperCase()}`}
+                      label={`${(
+                        selectedRequest.priority || "low"
+                      ).toUpperCase()}`}
                       color={getPriorityColor(selectedRequest.priority)}
                       size="small"
                     />
@@ -2091,7 +2101,9 @@ const Authority = () => {
                 {Object.values(PRIORITY_LEVELS).map((priority) => (
                   <Button
                     key={priority}
-                    variant={newPriority === priority ? "contained" : "outlined"}
+                    variant={
+                      newPriority === priority ? "contained" : "outlined"
+                    }
                     color={getPriorityColor(priority)}
                     onClick={() => setNewPriority(priority)}
                     fullWidth>
@@ -2108,7 +2120,9 @@ const Authority = () => {
             onClick={confirmChangePriority}
             variant="contained"
             color="primary"
-            disabled={!newPriority || newPriority === selectedRequest?.priority}>
+            disabled={
+              !newPriority || newPriority === selectedRequest?.priority
+            }>
             Confirm
           </Button>
         </DialogActions>

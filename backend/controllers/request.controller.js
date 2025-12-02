@@ -227,9 +227,7 @@ const updatePriority = asyncHandler(async (req, res) => {
   const validPriorities = ["low", "medium", "high", "sos"];
   if (!priority || !validPriorities.includes(priority)) {
     res.status(400);
-    throw new Error(
-      "Invalid priority. Must be one of: low, medium, high, sos"
-    );
+    throw new Error("Invalid priority. Must be one of: low, medium, high, sos");
   }
 
   const reqDoc = await Request.findById(req.params.id);

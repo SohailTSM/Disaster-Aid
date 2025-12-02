@@ -97,200 +97,202 @@ export default function Navbar() {
 
   return (
     <>
-    <AppBar position="static" color="primary">
-      <Container maxWidth="xl">
-        <Toolbar disableGutters>
-          <Typography
-            variant="h6"
-            noWrap
-            component={RouterLink}
-            to="/"
-            sx={{
-              mr: 2,
-              fontWeight: 700,
-              color: "inherit",
-              textDecoration: "none",
-              "&:hover": {
-                opacity: 0.9,
-              },
-            }}>
-            DisasterAid
-          </Typography>
-
-          <Box sx={{ flexGrow: 1, display: "flex", ml: 3 }}>
-            <Button
+      <AppBar position="static" color="primary">
+        <Container maxWidth="xl">
+          <Toolbar disableGutters>
+            <Typography
+              variant="h6"
+              noWrap
               component={RouterLink}
               to="/"
-              sx={{ my: 2, color: "white", display: "block" }}>
-              Home
-            </Button>
+              sx={{
+                mr: 2,
+                fontWeight: 700,
+                color: "inherit",
+                textDecoration: "none",
+                "&:hover": {
+                  opacity: 0.9,
+                },
+              }}>
+              DisasterAid
+            </Typography>
 
-            {!isAuthenticated() && (
-              <>
+            <Box sx={{ flexGrow: 1, display: "flex", ml: 3 }}>
+              <Button
+                component={RouterLink}
+                to="/"
+                sx={{ my: 2, color: "white", display: "block" }}>
+                Home
+              </Button>
+
+              {!isAuthenticated() && (
+                <>
+                  <Button
+                    component={RouterLink}
+                    to="/request"
+                    sx={{ my: 2, color: "white", display: "block" }}>
+                    Request Help
+                  </Button>
+                  <Button
+                    component={RouterLink}
+                    to="/track-status"
+                    sx={{ my: 2, color: "white", display: "block" }}>
+                    Track Status
+                  </Button>
+                  <Button
+                    component={RouterLink}
+                    to="/advisories"
+                    sx={{ my: 2, color: "white", display: "block" }}>
+                    Advisories
+                  </Button>
+                </>
+              )}
+
+              {isAuthenticated() && user?.role === "dispatcher" && (
                 <Button
                   component={RouterLink}
-                  to="/request"
+                  to="/dispatcher"
                   sx={{ my: 2, color: "white", display: "block" }}>
-                  Request Help
+                  Dashboard
                 </Button>
+              )}
+
+              {isAuthenticated() && user?.role === "ngo_member" && (
                 <Button
                   component={RouterLink}
-                  to="/track-status"
+                  to="/ngo"
                   sx={{ my: 2, color: "white", display: "block" }}>
-                  Track Status
+                  Dashboard
                 </Button>
+              )}
+
+              {isAuthenticated() && user?.role === "admin" && (
                 <Button
                   component={RouterLink}
-                  to="/advisories"
+                  to="/admin"
                   sx={{ my: 2, color: "white", display: "block" }}>
-                  Advisories
+                  Dashboard
                 </Button>
-              </>
-            )}
+              )}
 
-            {isAuthenticated() && user?.role === "dispatcher" && (
-              <Button
-                component={RouterLink}
-                to="/dispatcher"
-                sx={{ my: 2, color: "white", display: "block" }}>
-                Dashboard
-              </Button>
-            )}
+              {isAuthenticated() && user?.role === "authority" && (
+                <Button
+                  component={RouterLink}
+                  to="/authority"
+                  sx={{ my: 2, color: "white", display: "block" }}>
+                  Dashboard
+                </Button>
+              )}
+            </Box>
 
-            {isAuthenticated() && user?.role === "ngo_member" && (
-              <Button
-                component={RouterLink}
-                to="/ngo"
-                sx={{ my: 2, color: "white", display: "block" }}>
-                Dashboard
-              </Button>
-            )}
+            <Box sx={{ flexGrow: 0 }}>
+              {isAuthenticated() ? (
+                <>
+                  <IconButton
+                    onClick={handleMenu}
+                    size="small"
+                    aria-controls="menu-appbar"
+                    aria-haspopup="true"
+                    color="inherit">
+                    <Avatar sx={{ bgcolor: "secondary.main" }}>
+                      {getInitials(user?.name || "U")}
+                    </Avatar>
+                  </IconButton>
+                  <Menu
+                    id="menu-appbar"
+                    anchorEl={anchorEl}
+                    anchorOrigin={{
+                      vertical: "bottom",
+                      horizontal: "right",
+                    }}
+                    keepMounted
+                    transformOrigin={{
+                      vertical: "top",
+                      horizontal: "right",
+                    }}
+                    open={open}
+                    onClose={handleClose}>
+                    <MenuItem disabled>{user?.name}</MenuItem>
+                    <MenuItem disabled>{user?.email}</MenuItem>
+                    <MenuItem onClick={handleOpenChangePassword}>
+                      Change Password
+                    </MenuItem>
+                    <MenuItem onClick={handleLogout}>Logout</MenuItem>
+                  </Menu>
+                </>
+              ) : (
+                <>
+                  <Button
+                    component={RouterLink}
+                    to="/login"
+                    color="inherit"
+                    sx={{ mx: 1 }}>
+                    Login
+                  </Button>
+                  <Button
+                    component={RouterLink}
+                    to="/register"
+                    variant="outlined"
+                    color="inherit"
+                    sx={{ ml: 1 }}>
+                    Register Your NGO
+                  </Button>
+                </>
+              )}
+            </Box>
+          </Toolbar>
+        </Container>
+      </AppBar>
 
-            {isAuthenticated() && user?.role === "admin" && (
-              <Button
-                component={RouterLink}
-                to="/admin"
-                sx={{ my: 2, color: "white", display: "block" }}>
-                Dashboard
-              </Button>
-            )}
-
-            {isAuthenticated() && user?.role === "authority" && (
-              <Button
-                component={RouterLink}
-                to="/authority"
-                sx={{ my: 2, color: "white", display: "block" }}>
-                Dashboard
-              </Button>
-            )}
+      {/* Change Password Dialog */}
+      <Dialog
+        open={changePasswordOpen}
+        onClose={handleCloseChangePassword}
+        maxWidth="sm"
+        fullWidth>
+        <DialogTitle>Change Password</DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2, display: "flex", flexDirection: "column", gap: 2 }}>
+            <TextField
+              label="Current Password"
+              type="password"
+              fullWidth
+              value={oldPassword}
+              onChange={(e) => setOldPassword(e.target.value)}
+              autoComplete="current-password"
+            />
+            <TextField
+              label="New Password"
+              type="password"
+              fullWidth
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              helperText="Must be at least 6 characters"
+              autoComplete="new-password"
+            />
+            <TextField
+              label="Confirm New Password"
+              type="password"
+              fullWidth
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              autoComplete="new-password"
+            />
           </Box>
-
-          <Box sx={{ flexGrow: 0 }}>
-            {isAuthenticated() ? (
-              <>
-                <IconButton
-                  onClick={handleMenu}
-                  size="small"
-                  aria-controls="menu-appbar"
-                  aria-haspopup="true"
-                  color="inherit">
-                  <Avatar sx={{ bgcolor: "secondary.main" }}>
-                    {getInitials(user?.name || "U")}
-                  </Avatar>
-                </IconButton>
-                <Menu
-                  id="menu-appbar"
-                  anchorEl={anchorEl}
-                  anchorOrigin={{
-                    vertical: "bottom",
-                    horizontal: "right",
-                  }}
-                  keepMounted
-                  transformOrigin={{
-                    vertical: "top",
-                    horizontal: "right",
-                  }}
-                  open={open}
-                  onClose={handleClose}>
-                  <MenuItem disabled>{user?.name}</MenuItem>
-                  <MenuItem disabled>{user?.email}</MenuItem>
-                  <MenuItem onClick={handleOpenChangePassword}>Change Password</MenuItem>
-                  <MenuItem onClick={handleLogout}>Logout</MenuItem>
-                </Menu>
-              </>
-            ) : (
-              <>
-                <Button
-                  component={RouterLink}
-                  to="/login"
-                  color="inherit"
-                  sx={{ mx: 1 }}>
-                  Login
-                </Button>
-                <Button
-                  component={RouterLink}
-                  to="/register"
-                  variant="outlined"
-                  color="inherit"
-                  sx={{ ml: 1 }}>
-                  Register Your NGO
-                </Button>
-              </>
-            )}
-          </Box>
-        </Toolbar>
-      </Container>
-    </AppBar>
-
-    {/* Change Password Dialog */}
-    <Dialog
-      open={changePasswordOpen}
-      onClose={handleCloseChangePassword}
-      maxWidth="sm"
-      fullWidth>
-      <DialogTitle>Change Password</DialogTitle>
-      <DialogContent>
-        <Box sx={{ mt: 2, display: "flex", flexDirection: "column", gap: 2 }}>
-          <TextField
-            label="Current Password"
-            type="password"
-            fullWidth
-            value={oldPassword}
-            onChange={(e) => setOldPassword(e.target.value)}
-            autoComplete="current-password"
-          />
-          <TextField
-            label="New Password"
-            type="password"
-            fullWidth
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            helperText="Must be at least 6 characters"
-            autoComplete="new-password"
-          />
-          <TextField
-            label="Confirm New Password"
-            type="password"
-            fullWidth
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            autoComplete="new-password"
-          />
-        </Box>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={handleCloseChangePassword} disabled={loading}>
-          Cancel
-        </Button>
-        <Button
-          onClick={handleChangePassword}
-          variant="contained"
-          color="primary"
-          disabled={loading}>
-          {loading ? "Changing..." : "Change Password"}
-        </Button>
-      </DialogActions>
-    </Dialog>
-  </>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseChangePassword} disabled={loading}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleChangePassword}
+            variant="contained"
+            color="primary"
+            disabled={loading}>
+            {loading ? "Changing..." : "Change Password"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 }
