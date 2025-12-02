@@ -42,7 +42,7 @@ const requestSchema = new Schema({
       quantity: { type: Number, required: true, min: 1 },
       assignmentStatus: {
         type: String,
-        enum: ["unassigned", "assigned", "declined"],
+        enum: ["unassigned", "assigned", "declined", "completed"],
         default: "unassigned",
       },
       assignedTo: { type: Schema.Types.ObjectId, ref: "Organization" },
@@ -53,7 +53,13 @@ const requestSchema = new Schema({
   beneficiaries_children: { type: Number, default: 0 },
   beneficiaries_elderly: { type: Number, default: 0 },
   specialNeeds: { type: String },
-  evidence: [{ type: String }], // Array of file URLs/paths for images/videos
+  evidence: [
+    {
+      s3Key: { type: String }, // S3 object key
+      originalName: { type: String }, // Original filename
+      uploadedAt: { type: Date, default: Date.now },
+    },
+  ], // Array of images stored in S3
   priority: {
     type: String,
     enum: ["low", "medium", "high", "sos"],

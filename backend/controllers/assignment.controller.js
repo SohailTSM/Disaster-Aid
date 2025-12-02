@@ -2,6 +2,7 @@ const asyncHandler = require("express-async-handler");
 const Assignment = require("../models/assignment.model");
 const AssignmentService = require("../services/assignment.service");
 const Organization = require("../models/organization.model");
+const { uploadFile, getSignedDownloadUrl } = require("../services/s3.service");
 
 // POST /api/assignments (dispatcher)
 const createAssignment = asyncHandler(async (req, res) => {
@@ -47,7 +48,39 @@ const myAssignments = asyncHandler(async (req, res) => {
     .populate("requestId")
     .populate("dispatcherId", "name email")
     .sort({ createdAt: -1 });
-  res.json({ assignments });
+
+  // Generate signed URLs for completion proof images and request evidence
+  const assignmentsWithUrls = await Promise.all(
+    assignments.map(async (assignment) => {
+      const assignmentObj = assignment.toObject();
+
+      // Generate signed URL for completion proof
+      if (assignment.completionProof?.s3Key) {
+        assignmentObj.completionProof.imageUrl = await getSignedDownloadUrl(
+          assignment.completionProof.s3Key
+        );
+      }
+
+      // Generate signed URLs for request evidence
+      if (
+        assignment.requestId?.evidence &&
+        assignment.requestId.evidence.length > 0
+      ) {
+        assignmentObj.requestId.evidence = await Promise.all(
+          assignment.requestId.evidence.map(async (img) => ({
+            s3Key: img.s3Key,
+            originalName: img.originalName,
+            uploadedAt: img.uploadedAt,
+            url: await getSignedDownloadUrl(img.s3Key),
+          }))
+        );
+      }
+
+      return assignmentObj;
+    })
+  );
+
+  res.json({ assignments: assignmentsWithUrls });
 });
 
 // PUT /api/assignments/:id/accept (ngo_member) - Accept assignment
@@ -133,12 +166,26 @@ const declineAssignment = asyncHandler(async (req, res) => {
     await request.save();
   }
 
+  // Restore NGO offers when assignment is declined
+  const org = await Organization.findById(assignment.organizationId);
+  if (org && request) {
+    assignment.assignedNeeds.forEach((needType) => {
+      const need = request.needs.find((n) => n.type === needType);
+      if (need) {
+        const offerIndex = org.offers.findIndex((o) => o.type === needType);
+        if (offerIndex !== -1) {
+          org.offers[offerIndex].quantity += need.quantity;
+        }
+      }
+    });
+    await org.save();
+  }
+
   res.json({ message: "Assignment declined", assignment });
 });
 
 // PUT /api/assignments/:id/status (ngo_member) - Update assignment progress
 const updateAssignmentStatus = asyncHandler(async (req, res) => {
-  const { status, deliveryDetails, completionProof, notes } = req.body;
   const assignment = await Assignment.findById(req.params.id);
 
   if (!assignment) {
@@ -154,6 +201,19 @@ const updateAssignmentStatus = asyncHandler(async (req, res) => {
     throw new Error("Not authorized to update this assignment");
   }
 
+  // Parse data from form-data (if multipart) or regular JSON
+  let requestData;
+  if (req.body.data) {
+    requestData =
+      typeof req.body.data === "string"
+        ? JSON.parse(req.body.data)
+        : req.body.data;
+  } else {
+    requestData = req.body;
+  }
+
+  const { status, deliveryDetails, completionNotes, notes } = requestData;
+
   // Validate status transitions
   const validStatuses = ["Processing", "In-Transit", "Completed"];
   if (!validStatuses.includes(status)) {
@@ -167,11 +227,31 @@ const updateAssignmentStatus = asyncHandler(async (req, res) => {
     throw new Error("Delivery details required for In-Transit status");
   }
 
-  // For Completed, completion proof is optional for now (image upload to be implemented later)
-  // if (status === "Completed" && !completionProof?.imageUrl) {
-  //   res.status(400);
-  //   throw new Error("Completion proof image required for Completed status");
-  // }
+  // Handle image upload for Completed status
+  if (status === "Completed") {
+    if (req.file) {
+      // Upload image to S3
+      const uploadedFile = await uploadFile(
+        req.file.buffer,
+        req.file.originalname,
+        req.file.mimetype,
+        "deliveries"
+      );
+      assignment.completionProof = {
+        s3Key: uploadedFile.key,
+        originalName: uploadedFile.originalName,
+        uploadedAt: new Date(),
+        completedAt: new Date(),
+        completionNotes: completionNotes || "",
+      };
+    } else {
+      // Allow completion without image (optional)
+      assignment.completionProof = {
+        completedAt: new Date(),
+        completionNotes: completionNotes || "",
+      };
+    }
+  }
 
   assignment.status = status;
   if (notes) assignment.notes = notes;
@@ -180,14 +260,73 @@ const updateAssignmentStatus = asyncHandler(async (req, res) => {
     assignment.deliveryDetails = deliveryDetails;
   }
 
-  if (completionProof) {
-    assignment.completionProof = {
-      ...completionProof,
-      completedAt: new Date(),
-    };
+  await assignment.save();
+
+  // Update request status and individual need statuses when assignment is completed
+  if (status === "Completed") {
+    const Request = require("../models/request.model");
+    const request = await Request.findById(assignment.requestId);
+
+    if (request) {
+      // Mark individual needs as completed for this assignment
+      assignment.assignedNeeds.forEach((needType) => {
+        const needIndex = request.needs.findIndex(
+          (n) =>
+            n.type === needType &&
+            n.assignmentId &&
+            n.assignmentId.toString() === assignment._id.toString()
+        );
+
+        if (needIndex !== -1) {
+          request.needs[needIndex].assignmentStatus = "completed";
+        }
+      });
+
+      // Get all assignments for this request
+      const allAssignments = await Assignment.find({
+        requestId: assignment.requestId,
+      });
+
+      // Count total assigned needs and completed needs
+      const totalAssignedNeeds = request.needs.filter(
+        (need) =>
+          need.assignmentStatus === "assigned" ||
+          need.assignmentStatus === "completed"
+      ).length;
+
+      const completedAssignments = allAssignments.filter(
+        (a) => a.status === "Completed"
+      );
+
+      // Count how many needs are fulfilled by completed assignments
+      let completedNeedsCount = 0;
+      completedAssignments.forEach((completedAssignment) => {
+        completedAssignment.assignedNeeds.forEach((needType) => {
+          const needExists = request.needs.some(
+            (n) =>
+              n.type === needType &&
+              (n.assignmentStatus === "assigned" ||
+                n.assignmentStatus === "completed")
+          );
+          if (needExists) {
+            completedNeedsCount++;
+          }
+        });
+      });
+
+      // Update request status based on completion
+      if (completedNeedsCount >= totalAssignedNeeds && totalAssignedNeeds > 0) {
+        // All assigned needs are fulfilled
+        request.status = "Closed";
+      } else if (completedNeedsCount > 0) {
+        // Some needs are fulfilled
+        request.status = "In-Progress";
+      }
+
+      await request.save();
+    }
   }
 
-  await assignment.save();
   res.json({ message: "Assignment status updated", assignment });
 });
 
@@ -205,6 +344,31 @@ const updateAssignment = asyncHandler(async (req, res) => {
   res.json({ message: "Assignment updated", assignment });
 });
 
+// GET /api/assignments/request/:requestId - Get assignments for a specific request
+const getAssignmentsByRequest = asyncHandler(async (req, res) => {
+  const assignments = await Assignment.find({
+    requestId: req.params.requestId,
+  })
+    .populate("organizationId", "name contact email")
+    .populate("dispatcherId", "name email")
+    .sort({ createdAt: -1 });
+
+  // Generate signed URLs for completion proof images
+  const assignmentsWithUrls = await Promise.all(
+    assignments.map(async (assignment) => {
+      const assignmentObj = assignment.toObject();
+      if (assignment.completionProof?.s3Key) {
+        assignmentObj.completionProof.imageUrl = await getSignedDownloadUrl(
+          assignment.completionProof.s3Key
+        );
+      }
+      return assignmentObj;
+    })
+  );
+
+  res.json({ assignments: assignmentsWithUrls });
+});
+
 module.exports = {
   createAssignment,
   listAssignments,
@@ -213,4 +377,5 @@ module.exports = {
   acceptAssignment,
   declineAssignment,
   updateAssignmentStatus,
+  getAssignmentsByRequest,
 };

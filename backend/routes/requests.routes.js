@@ -11,11 +11,13 @@ const {
 } = require("../controllers/request.controller");
 const auth = require("../middleware/auth.middleware");
 const allowedRoles = require("../middleware/roles.middleware");
+const upload = require("../middleware/upload.middleware");
 
 // Public endpoint for victims to check request status/details by requestId
 router.get("/by-requestid/:requestId", getRequestByRequestId);
 
-router.post("/", createRequest);
+// POST request with file upload (up to 5 images)
+router.post("/", upload.array("images", 5), createRequest);
 router.get(
   "/",
   auth,

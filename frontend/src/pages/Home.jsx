@@ -145,55 +145,63 @@ const Home = () => {
         </Grid>
 
         {/* Additional Actions */}
-        <Grid container spacing={3} sx={{ mt: 4 }}>
+        <Grid container spacing={4} sx={{ mt: 4 }}>
           <Grid item xs={12} md={6}>
-            <Paper
+            <Card
               sx={{
-                p: 4,
-                textAlign: "center",
+                height: "100%",
                 background: "rgba(255, 255, 255, 0.95)",
                 backdropFilter: "blur(10px)",
               }}>
-              <Typography variant="h5" gutterBottom sx={{ fontWeight: "bold" }}>
-                Track Your Request
-              </Typography>
-              <Typography variant="body1" color="text.secondary" paragraph>
-                Already submitted a request? Track its status using your Request
-                ID.
-              </Typography>
-              <Button
-                variant="outlined"
-                size="large"
-                onClick={() => navigate("/track-status")}
-                sx={{ mt: 2 }}>
-                Track Status
-              </Button>
-            </Paper>
+              <CardContent sx={{ textAlign: "center", py: 4 }}>
+                <Typography
+                  variant="h5"
+                  gutterBottom
+                  sx={{ fontWeight: "bold" }}>
+                  Track Your Request
+                </Typography>
+                <Typography variant="body1" color="text.secondary" paragraph>
+                  Already submitted a request? Track its status using your
+                  Request ID.
+                </Typography>
+                <Button
+                  variant="outlined"
+                  size="large"
+                  onClick={() => navigate("/track-status")}
+                  sx={{ mt: 2 }}>
+                  Track Status
+                </Button>
+              </CardContent>
+            </Card>
           </Grid>
 
           <Grid item xs={12} md={6}>
-            <Paper
+            <Card
               sx={{
-                p: 4,
-                textAlign: "center",
+                height: "100%",
                 background: "rgba(255, 255, 255, 0.95)",
                 backdropFilter: "blur(10px)",
               }}>
-              <Typography variant="h5" gutterBottom sx={{ fontWeight: "bold" }}>
-                Emergency Advisories
-              </Typography>
-              <Typography variant="body1" color="text.secondary" paragraph>
-                View important announcements and safety information from
-                authorities.
-              </Typography>
-              <Button
-                variant="outlined"
-                size="large"
-                onClick={() => navigate("/advisories")}
-                sx={{ mt: 2 }}>
-                View Advisories
-              </Button>
-            </Paper>
+              <CardContent sx={{ textAlign: "center", py: 4 }}>
+                <Typography
+                  variant="h5"
+                  gutterBottom
+                  sx={{ fontWeight: "bold" }}>
+                  Emergency Advisories
+                </Typography>
+                <Typography variant="body1" color="text.secondary" paragraph>
+                  View important announcements and safety information from
+                  authorities.
+                </Typography>
+                <Button
+                  variant="outlined"
+                  size="large"
+                  onClick={() => navigate("/advisories")}
+                  sx={{ mt: 2 }}>
+                  View Advisories
+                </Button>
+              </CardContent>
+            </Card>
           </Grid>
         </Grid>
 

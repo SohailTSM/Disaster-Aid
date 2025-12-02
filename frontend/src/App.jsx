@@ -45,7 +45,12 @@ const theme = createTheme({
 
 // Protected route component for authenticated users
 const ProtectedRoute = ({ children, roles = [] }) => {
-  const { isAuthenticated, hasRole } = useAuth();
+  const { isAuthenticated, hasRole, loading } = useAuth();
+
+  // Wait for auth to load before redirecting
+  if (loading) {
+    return <div>Loading...</div>;
+  }
 
   if (!isAuthenticated()) {
     return <Navigate to="/login" replace />;

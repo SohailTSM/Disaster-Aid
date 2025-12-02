@@ -50,7 +50,9 @@ const assignmentSchema = new Schema({
 
   // Completion proof
   completionProof: {
-    imageUrl: { type: String },
+    s3Key: { type: String }, // S3 object key
+    originalName: { type: String }, // Original filename
+    uploadedAt: { type: Date },
     completedAt: { type: Date },
     completionNotes: { type: String },
   },

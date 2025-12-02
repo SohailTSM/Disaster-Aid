@@ -139,6 +139,11 @@ export default function Dispatcher() {
     useState(null);
   const [selectedNgoForNeed, setSelectedNgoForNeed] = useState("");
 
+  // Evidence and Delivery Proof dialogs
+  const [evidenceDialogOpen, setEvidenceDialogOpen] = useState(false);
+  const [deliveryProofDialogOpen, setDeliveryProofDialogOpen] = useState(false);
+  const [selectedDeliveryProof, setSelectedDeliveryProof] = useState(null);
+
   // Stats data is initialized but not rendered in the provided JSX.
   // Kept for completeness.
   const [statsData, setStatsData] = useState([
@@ -184,10 +189,12 @@ export default function Dispatcher() {
         setAllRequests(requests);
         setFilteredRequests(requests);
 
-        // Fetch all NGOs
-        const ngoData = await organizationService.getOrganizations();
+        // Fetch all verified NGOs
+        const ngoData = await organizationService.getOrganizations(true);
         const ngoList = ngoData.organizations || [];
-        setNgos(ngoList);
+        // Filter out suspended NGOs
+        const activeNgos = ngoList.filter((ngo) => !ngo.suspended);
+        setNgos(activeNgos);
 
         // Update stats
         updateStats(requests);
@@ -558,9 +565,18 @@ export default function Dispatcher() {
   }
 
   // Handle opening the "View" dialog
-  const handleViewRequest = (request) => {
-    setSelectedRequest(request);
+  const handleViewRequest = async (request) => {
     setViewDialogOpen(true);
+    setSelectedRequest(null); // Clear previous data
+    try {
+      // Fetch full request details with signed URLs for evidence
+      const response = await requestService.getRequestById(request._id);
+      setSelectedRequest(response.request);
+    } catch (error) {
+      console.error("Error fetching request details:", error);
+      toast.error("Failed to load request details");
+      setSelectedRequest(request); // Fallback to list data
+    }
   };
 
   // Error state
@@ -918,7 +934,9 @@ export default function Dispatcher() {
                               need.assignmentStatus === "assigned";
                             const isDeclined =
                               need.assignmentStatus === "declined";
-                            const canEdit = !isAssigned;
+                            const isCompleted =
+                              need.assignmentStatus === "completed";
+                            const canEdit = !isAssigned && !isCompleted;
 
                             return (
                               <Box
@@ -948,6 +966,12 @@ export default function Dispatcher() {
                                           fontSize="small"
                                         />
                                       )}
+                                      {isCompleted && (
+                                        <CheckCircleIcon
+                                          color="primary"
+                                          fontSize="small"
+                                        />
+                                      )}
                                       {isDeclined && (
                                         <WarningIcon
                                           color="warning"
@@ -958,7 +982,14 @@ export default function Dispatcher() {
 
                                     {/* Status Chip */}
                                     <Box display="flex" gap={1} mb={1}>
-                                      {isAssigned && (
+                                      {isCompleted && (
+                                        <Chip
+                                          label="Completed"
+                                          color="primary"
+                                          size="small"
+                                        />
+                                      )}
+                                      {isAssigned && !isCompleted && (
                                         <Chip
                                           label="Assigned"
                                           color="success"
@@ -972,40 +1003,43 @@ export default function Dispatcher() {
                                           size="small"
                                         />
                                       )}
-                                      {!isAssigned && !isDeclined && (
-                                        <Chip
-                                          label="Available"
-                                          color="default"
-                                          size="small"
-                                          variant="outlined"
-                                        />
-                                      )}
+                                      {!isAssigned &&
+                                        !isDeclined &&
+                                        !isCompleted && (
+                                          <Chip
+                                            label="Available"
+                                            color="default"
+                                            size="small"
+                                            variant="outlined"
+                                          />
+                                        )}
                                     </Box>
 
                                     {/* Show assigned NGO */}
-                                    {isAssigned && need.assignedTo && (
-                                      <Box
-                                        display="flex"
-                                        alignItems="center"
-                                        gap={0.5}>
-                                        <BusinessIcon
-                                          fontSize="small"
-                                          color="primary"
-                                        />
-                                        <Typography
-                                          variant="caption"
-                                          color="text.secondary">
-                                          {ngos.find(
-                                            (n) => n._id === need.assignedTo
-                                          )?.name || "NGO"}
-                                        </Typography>
-                                      </Box>
-                                    )}
+                                    {(isAssigned || isCompleted) &&
+                                      need.assignedTo && (
+                                        <Box
+                                          display="flex"
+                                          alignItems="center"
+                                          gap={0.5}>
+                                          <BusinessIcon
+                                            fontSize="small"
+                                            color="primary"
+                                          />
+                                          <Typography
+                                            variant="caption"
+                                            color="text.secondary">
+                                            {ngos.find(
+                                              (n) => n._id === need.assignedTo
+                                            )?.name || "NGO"}
+                                          </Typography>
+                                        </Box>
+                                      )}
                                   </Box>
 
                                   {/* Action Buttons */}
                                   <Box display="flex" gap={0.5}>
-                                    {!isAssigned && (
+                                    {!isAssigned && !isCompleted && (
                                       <Button
                                         size="small"
                                         variant="outlined"
@@ -1164,6 +1198,37 @@ export default function Dispatcher() {
           )}
         </DialogContent>
         <DialogActions>
+          <Button
+            onClick={() => setEvidenceDialogOpen(true)}
+            variant="outlined"
+            sx={{ mr: "auto" }}>
+            View Evidence
+          </Button>
+          <Button
+            onClick={async () => {
+              // Fetch assignments with completion proof
+              try {
+                const response =
+                  await assignmentService.getAssignmentsByRequest(
+                    selectedRequest._id
+                  );
+                const completedAssignments = response.assignments?.filter(
+                  (a) => a.status === "Completed" && a.completionProof
+                );
+                if (completedAssignments && completedAssignments.length > 0) {
+                  setSelectedDeliveryProof(completedAssignments);
+                  setDeliveryProofDialogOpen(true);
+                } else {
+                  toast.info("No delivery proof available yet");
+                }
+              } catch (error) {
+                console.error("Error fetching delivery proofs:", error);
+                toast.error("Failed to load delivery proof");
+              }
+            }}
+            variant="outlined">
+            View Delivery Proof
+          </Button>
           <Button onClick={handleCloseDialog}>Close</Button>
         </DialogActions>
       </Dialog>
@@ -1334,16 +1399,17 @@ export default function Dispatcher() {
                   .filter((ngo) => {
                     // For matched NGOs from geospatial service, they're already pre-filtered
                     // Just check if they offer the needed resource
-                    const resources = ngo.offers || ngo.availableResources || [];
+                    const resources =
+                      ngo.offers || ngo.availableResources || [];
                     const hasResource = resources.some(
                       (offer) => offer.type === selectedNeedForAssignment?.type
                     );
-                    
+
                     // If from geospatial service (has distanceText), trust the backend filtering
                     if (ngo.distanceText) {
                       return hasResource;
                     }
-                    
+
                     // For regular NGOs list, apply full filter
                     return (
                       (ngo.approved || ngo.verificationStatus === "verified") &&
@@ -1358,7 +1424,8 @@ export default function Dispatcher() {
                     const matchedNGO = matchedNGOs.find(
                       (m) => m._id === ngo._id
                     );
-                    const resources = ngo.offers || ngo.availableResources || [];
+                    const resources =
+                      ngo.offers || ngo.availableResources || [];
                     const canFulfill = matchedNGO?.canFullyFulfill;
 
                     return (
@@ -1426,12 +1493,17 @@ export default function Dispatcher() {
 
             {matchedNGOs.length > 0 && (
               <Alert severity="success" sx={{ mt: 2 }}>
-                Showing {matchedNGOs.filter((ngo) => {
-                  const resources = ngo.offers || ngo.availableResources || [];
-                  return resources.some(
-                    (offer) => offer.type === selectedNeedForAssignment?.type
-                  );
-                }).length} nearby NGOs sorted by distance and availability
+                Showing{" "}
+                {
+                  matchedNGOs.filter((ngo) => {
+                    const resources =
+                      ngo.offers || ngo.availableResources || [];
+                    return resources.some(
+                      (offer) => offer.type === selectedNeedForAssignment?.type
+                    );
+                  }).length
+                }{" "}
+                nearby NGOs sorted by distance and availability
               </Alert>
             )}
           </Box>
@@ -1443,6 +1515,173 @@ export default function Dispatcher() {
             variant="contained"
             disabled={!selectedNgoForNeed || loading}>
             {loading ? <CircularProgress size={24} /> : "Assign"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Evidence Dialog */}
+      <Dialog
+        open={evidenceDialogOpen}
+        onClose={() => setEvidenceDialogOpen(false)}
+        maxWidth="md"
+        fullWidth>
+        <DialogTitle>Request Evidence</DialogTitle>
+        <DialogContent>
+          {selectedRequest?.evidence && selectedRequest.evidence.length > 0 ? (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Images uploaded by the victim at the time of request submission:
+              </Typography>
+              <Grid container spacing={2} sx={{ mt: 1 }}>
+                {selectedRequest.evidence.map((img, index) => (
+                  <Grid item xs={12} sm={6} md={4} key={index}>
+                    <Paper
+                      elevation={2}
+                      sx={{
+                        p: 1,
+                        height: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                      }}>
+                      <Box
+                        component="img"
+                        src={img.url}
+                        alt={img.originalName || `Evidence ${index + 1}`}
+                        sx={{
+                          width: "100%",
+                          height: 200,
+                          objectFit: "cover",
+                          borderRadius: 1,
+                          mb: 1,
+                        }}
+                      />
+                      <Typography variant="caption" color="text.secondary">
+                        {img.originalName}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Uploaded: {new Date(img.uploadedAt).toLocaleString()}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                ))}
+              </Grid>
+            </Box>
+          ) : (
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                minHeight: 200,
+                color: "text.secondary",
+              }}>
+              <Typography variant="h6" gutterBottom>
+                No Evidence Available
+              </Typography>
+              <Typography variant="body2">
+                The victim did not upload any images with this request.
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEvidenceDialogOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delivery Proof Dialog */}
+      <Dialog
+        open={deliveryProofDialogOpen}
+        onClose={() => setDeliveryProofDialogOpen(false)}
+        maxWidth="md"
+        fullWidth>
+        <DialogTitle>Delivery Proof</DialogTitle>
+        <DialogContent>
+          {selectedDeliveryProof && selectedDeliveryProof.length > 0 ? (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Proof of delivery uploaded by NGOs:
+              </Typography>
+              <Stack spacing={3} sx={{ mt: 2 }}>
+                {selectedDeliveryProof.map((assignment, index) => (
+                  <Paper key={index} elevation={2} sx={{ p: 2 }}>
+                    <Typography variant="subtitle1" gutterBottom>
+                      {assignment.organizationId?.name || "NGO"}
+                    </Typography>
+                    <Divider sx={{ mb: 2 }} />
+
+                    {assignment.completionProof?.s3Key ||
+                    assignment.completionProof?.imageUrl ? (
+                      <Box>
+                        <Box
+                          component="img"
+                          src={assignment.completionProof.imageUrl}
+                          alt="Delivery Proof"
+                          sx={{
+                            width: "100%",
+                            maxHeight: 400,
+                            objectFit: "contain",
+                            borderRadius: 1,
+                            mb: 2,
+                          }}
+                        />
+                        {assignment.completionProof.completionNotes && (
+                          <Box sx={{ mt: 2 }}>
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
+                              gutterBottom>
+                              Notes:
+                            </Typography>
+                            <Typography variant="body1">
+                              {assignment.completionProof.completionNotes}
+                            </Typography>
+                          </Box>
+                        )}
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          display="block"
+                          sx={{ mt: 1 }}>
+                          Completed:{" "}
+                          {new Date(
+                            assignment.completionProof.completedAt
+                          ).toLocaleString()}
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <Alert severity="info">
+                        NGO completed the delivery but did not upload proof
+                        image.
+                      </Alert>
+                    )}
+                  </Paper>
+                ))}
+              </Stack>
+            </Box>
+          ) : (
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                minHeight: 200,
+                color: "text.secondary",
+              }}>
+              <Typography variant="h6" gutterBottom>
+                No Delivery Proof Available
+              </Typography>
+              <Typography variant="body2">
+                No completed deliveries with proof of delivery yet.
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeliveryProofDialogOpen(false)}>
+            Close
           </Button>
         </DialogActions>
       </Dialog>

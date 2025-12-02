@@ -11,9 +11,10 @@ const setTokenCookie = (res, payload) => {
   });
   const cookieOpts = {
     httpOnly: true,
-    secure: process.env.COOKIE_SECURE === "true", // set true in prod + https
-    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production", // only secure in production
+    sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
     maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+    path: "/", // Ensure cookie is available for all paths
   };
   res.cookie("token", token, cookieOpts);
 };
@@ -117,7 +118,12 @@ const login = asyncHandler(async (req, res) => {
 
 // POST /api/auth/logout
 const logout = asyncHandler(async (req, res) => {
-  res.clearCookie("token");
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+    path: "/",
+  });
   res.json({ message: "Logged out" });
 });
 

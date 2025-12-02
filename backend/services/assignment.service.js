@@ -96,6 +96,25 @@ const createAssignment = async (
 
   await reqDoc.save();
 
+  // Decrease NGO offers when assignment is created
+  const Organization = require("../models/organization.model");
+  const org = await Organization.findById(organizationId);
+  if (org) {
+    assignedNeeds.forEach((needType) => {
+      const need = reqDoc.needs.find((n) => n.type === needType);
+      if (need) {
+        const offerIndex = org.offers.findIndex((o) => o.type === needType);
+        if (offerIndex !== -1) {
+          org.offers[offerIndex].quantity = Math.max(
+            0,
+            org.offers[offerIndex].quantity - need.quantity
+          );
+        }
+      }
+    });
+    await org.save();
+  }
+
   return ass;
 };
 

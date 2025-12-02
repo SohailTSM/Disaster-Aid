@@ -73,6 +73,9 @@ const NGO = () => {
   const [resourceDialogOpen, setResourceDialogOpen] = useState(false);
   const [selectedAssignment, setSelectedAssignment] = useState(null);
 
+  // Evidence dialog
+  const [evidenceDialogOpen, setEvidenceDialogOpen] = useState(false);
+
   // Decline dialog state
   const [declineReason, setDeclineReason] = useState("");
 
@@ -205,29 +208,20 @@ const NGO = () => {
 
   const handleStatusSubmit = async () => {
     try {
-      // For now, skip image upload and just mark as completed
-      // TODO: Implement proper image upload service (AWS S3, Cloudinary, etc.)
-      const imageUrl = completionImageFile
-        ? `uploaded_${completionImageFile.name}`
-        : "";
-
-      const payload = {
-        status: newStatus,
-        deliveryDetails: newStatus === "In-Transit" ? deliveryDetails : null,
-        completionProof:
-          newStatus === "Completed"
-            ? {
-                imageUrl: imageUrl, // Placeholder - not storing actual image data
-                completionNotes: completionNotes,
-              }
-            : null,
-      };
+      const completionProofData =
+        newStatus === "Completed"
+          ? {
+              completionNotes: completionNotes,
+            }
+          : null;
 
       await assignmentService.updateAssignmentStatus(
         selectedAssignment._id,
-        payload.status,
-        payload.deliveryDetails,
-        payload.completionProof
+        newStatus,
+        newStatus === "In-Transit" ? deliveryDetails : null,
+        completionProofData,
+        "",
+        completionImageFile // Pass the actual file for S3 upload
       );
 
       toast.success("Status updated successfully");
@@ -603,6 +597,12 @@ const NGO = () => {
           )}
         </DialogContent>
         <DialogActions>
+          <Button
+            onClick={() => setEvidenceDialogOpen(true)}
+            variant="outlined"
+            sx={{ mr: "auto" }}>
+            View Evidence
+          </Button>
           <Button onClick={() => setAcceptDialogOpen(false)}>Cancel</Button>
           <Button
             onClick={handleAcceptSubmit}
@@ -890,6 +890,78 @@ const NGO = () => {
           <Button onClick={handleResourceUpdate} variant="contained">
             Save Resources
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Evidence Dialog */}
+      <Dialog
+        open={evidenceDialogOpen}
+        onClose={() => setEvidenceDialogOpen(false)}
+        maxWidth="md"
+        fullWidth>
+        <DialogTitle>Request Evidence</DialogTitle>
+        <DialogContent>
+          {selectedAssignment?.requestId?.evidence &&
+          selectedAssignment.requestId.evidence.length > 0 ? (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Images uploaded by the victim at the time of request submission:
+              </Typography>
+              <Grid container spacing={2} sx={{ mt: 1 }}>
+                {selectedAssignment.requestId.evidence.map((img, index) => (
+                  <Grid item xs={12} sm={6} md={4} key={index}>
+                    <Paper
+                      elevation={2}
+                      sx={{
+                        p: 1,
+                        height: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                      }}>
+                      <Box
+                        component="img"
+                        src={img.url}
+                        alt={img.originalName || `Evidence ${index + 1}`}
+                        sx={{
+                          width: "100%",
+                          height: 200,
+                          objectFit: "cover",
+                          borderRadius: 1,
+                          mb: 1,
+                        }}
+                      />
+                      <Typography variant="caption" color="text.secondary">
+                        {img.originalName}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Uploaded: {new Date(img.uploadedAt).toLocaleString()}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                ))}
+              </Grid>
+            </Box>
+          ) : (
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                minHeight: 200,
+                color: "text.secondary",
+              }}>
+              <Typography variant="h6" gutterBottom>
+                No Evidence Available
+              </Typography>
+              <Typography variant="body2">
+                The victim did not upload any images with this request.
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEvidenceDialogOpen(false)}>Close</Button>
         </DialogActions>
       </Dialog>
     </Container>

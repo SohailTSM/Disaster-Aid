@@ -39,9 +39,14 @@ export const AuthProvider = ({ children }) => {
       const response = await authService.me();
       if (response?.user) {
         setUser(response.user);
+      } else {
+        setUser(null);
       }
     } catch (error) {
-      console.error("Error loading user data", error);
+      // Only log error if it's not a 401 (which is expected when not logged in)
+      if (error.response?.status !== 401) {
+        console.error("Error loading user data", error);
+      }
       // If we can't load user, they're not authenticated
       setUser(null);
     } finally {

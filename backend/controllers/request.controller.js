@@ -1,10 +1,31 @@
 const asyncHandler = require("express-async-handler");
 const Request = require("../models/request.model");
 const requestService = require("../services/request.service");
+const {
+  uploadMultipleFiles,
+  getSignedDownloadUrl,
+} = require("../services/s3.service");
 
 // POST /api/requests (public)
 const createRequest = asyncHandler(async (req, res) => {
-  const created = await requestService.createRequest(req.body);
+  // Handle image uploads if files are present
+  let evidenceData = [];
+  if (req.files && req.files.length > 0) {
+    const uploadedFiles = await uploadMultipleFiles(req.files, "requests");
+    evidenceData = uploadedFiles.map((file) => ({
+      s3Key: file.key,
+      originalName: file.originalName,
+    }));
+  }
+
+  // Parse JSON data from form-data
+  const requestData =
+    typeof req.body.data === "string" ? JSON.parse(req.body.data) : req.body;
+
+  // Add evidence to request data
+  requestData.evidence = evidenceData;
+
+  const created = await requestService.createRequest(requestData);
   res.status(201).json({
     request: created,
     requestId: created.requestId,
@@ -33,6 +54,22 @@ const getRequest = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Request not found");
   }
+
+  // Generate signed URLs for evidence images
+  if (reqDoc.evidence && reqDoc.evidence.length > 0) {
+    const evidenceWithUrls = await Promise.all(
+      reqDoc.evidence.map(async (img) => ({
+        s3Key: img.s3Key,
+        originalName: img.originalName,
+        uploadedAt: img.uploadedAt,
+        url: await getSignedDownloadUrl(img.s3Key),
+      }))
+    );
+    const reqObj = reqDoc.toObject();
+    reqObj.evidence = evidenceWithUrls;
+    return res.json({ request: reqObj });
+  }
+
   res.json({ request: reqDoc });
 });
 
@@ -61,9 +98,23 @@ const getRequestByRequestId = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Request not found");
   }
+
+  // Generate signed URLs for evidence images
+  let reqObj = reqDoc.toObject();
+  if (reqDoc.evidence && reqDoc.evidence.length > 0) {
+    reqObj.evidence = await Promise.all(
+      reqDoc.evidence.map(async (img) => ({
+        s3Key: img.s3Key,
+        originalName: img.originalName,
+        uploadedAt: img.uploadedAt,
+        url: await getSignedDownloadUrl(img.s3Key),
+      }))
+    );
+  }
+
   // Find all components for this request
   const components = await RequestComponent.find({ requestId: reqDoc._id });
-  res.json({ request: reqDoc, components });
+  res.json({ request: reqObj, components });
 });
 
 // PUT /api/requests/:requestId/needs/:needIndex - Update a specific need

@@ -405,14 +405,18 @@ export default function RequestForm() {
         requestData.deviceNetwork = networkStrength;
       }
 
-      // Handle file uploads if any
-      if (evidenceFiles.length > 0) {
-        // For now, we'll store file names. In production, you'd upload to cloud storage
-        requestData.evidence = evidenceFiles.map((file) => file.name);
-        // TODO: Implement actual file upload to cloud storage (AWS S3, Cloudinary, etc.)
-      }
+      // Create FormData to handle file uploads
+      const formData = new FormData();
 
-      const response = await requestService.createRequest(requestData);
+      // Add JSON data
+      formData.append("data", JSON.stringify(requestData));
+
+      // Add image files
+      evidenceFiles.forEach((file) => {
+        formData.append("images", file);
+      });
+
+      const response = await requestService.createRequest(formData);
 
       // Store the requestId from the response
       setSubmittedRequestId(response.requestId);

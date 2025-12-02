@@ -34,7 +34,12 @@ export const authService = {
 
 export const requestService = {
   createRequest: async (requestData) => {
-    const response = await api.post("/requests", requestData);
+    // Handle FormData differently (for file uploads)
+    const config =
+      requestData instanceof FormData
+        ? { headers: { "Content-Type": "multipart/form-data" } }
+        : {};
+    const response = await api.post("/requests", requestData, config);
     return response.data;
   },
   getRequests: async (filters = {}) => {
@@ -153,8 +158,28 @@ export const assignmentService = {
     status,
     deliveryDetails = null,
     completionProof = null,
-    notes = ""
+    notes = "",
+    imageFile = null
   ) => {
+    // If there's an image file, use FormData
+    if (imageFile) {
+      const formData = new FormData();
+      const data = {
+        status,
+        deliveryDetails,
+        completionNotes: completionProof?.completionNotes || "",
+        notes,
+      };
+      formData.append("data", JSON.stringify(data));
+      formData.append("image", imageFile);
+
+      const response = await api.put(`/assignments/${id}/status`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return response.data;
+    }
+
+    // No image, use regular JSON
     const response = await api.put(`/assignments/${id}/status`, {
       status,
       deliveryDetails,
